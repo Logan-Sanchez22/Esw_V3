@@ -56,7 +56,7 @@
     }
 
     .tabs-active {
-        @apply bg-primary;
+        @apply bg-secondary;
     }
 
     .tabs-glyph {
