@@ -5,11 +5,11 @@ import {SafeAreaView as RNSafeAreaView} from "react-native-safe-area-context";
 const SafeAreaView = styled(RNSafeAreaView);
 
 
-const QuestPage = () => {
+const GardenAlt = () => {
     return (
         <SafeAreaView className={"flex-1 bg-background p-5"}>
-            <Text className="text-xl font-bold text-success">QuestPage</Text>
+            <Text className="text-xl font-bold text-success">TopDown Garden</Text>
         </SafeAreaView>
     )
 }
-export default QuestPage
+export default GardenAlt
