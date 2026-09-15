@@ -24,6 +24,15 @@
     --color-warning: #FBBF24;
     --color-error: #F87171;
     --color-info: #60A5FA;
+    --color-sky: #87CEEB;
+
+    --font-sans: sans-regular;
+    --font-sans-light: light;
+    --font-sans-medium: sans-medium;
+    --font-sans-semibold: sans-semibold;
+    --font-sans-bold: sans-bold;
+    --font-sans-extrabold: sans-extrabold;
+
 
     --spacing-0: 0px;
     --spacing-1: 4px;
