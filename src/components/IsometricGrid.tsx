@@ -15,7 +15,14 @@ type Props = {
     gridSize: number;
     tileWidth: number;
     tileHeightStep: number;
-    renderTile: (index: number, row: number, col: number) => ReactNode;
+    /** The flat ground sprite for a tile. Ground tiles are drawn as one full pass,
+     * entirely behind every decoration (see `renderDecoration`) — this is what stops
+     * a "closer" tile's ground graphic from painting over a tall decoration behind it. */
+    renderGround: (index: number, row: number, col: number) => ReactNode;
+    /** What's planted/placed on a tile, or null/undefined for nothing. Decorations are
+     * drawn in a second pass, on top of every ground tile, still back-to-front sorted
+     * by row+col among themselves so two decorations still occlude each other correctly. */
+    renderDecoration?: (index: number, row: number, col: number) => ReactNode | null | undefined;
     onTilePress?: (index: number, row: number, col: number) => void;
 };
 
@@ -40,7 +47,8 @@ export function IsometricGrid({
                                   gridSize,
                                   tileWidth,
                                   tileHeightStep,
-                                  renderTile,
+                                  renderGround,
+                                  renderDecoration,
                                   onTilePress,
                               }: Props) {
     const [viewport, setViewport] = useState({
@@ -207,7 +215,8 @@ export function IsometricGrid({
         ],
     }));
 
-    const tiles = [];
+    const groundTiles = [];
+    const decorationTiles = [];
 
     const positions: { row: number; col: number }[] = [];
 
@@ -233,7 +242,7 @@ export function IsometricGrid({
         const y =
             (col + row) * (tileHeightStep / 2);
 
-        tiles.push(
+        groundTiles.push(
             <View
                 key={index}
                 style={{
@@ -246,9 +255,27 @@ export function IsometricGrid({
                     onTilePress?.(index, row, col)
                 }
             >
-                {renderTile(index, row, col)}
+                {renderGround(index, row, col)}
             </View>
         );
+
+        const decoration = renderDecoration?.(index, row, col);
+
+        if (decoration) {
+            decorationTiles.push(
+                <View
+                    key={index}
+                    style={{
+                        position: 'absolute',
+                        left: x,
+                        top: y,
+                        width: tileWidth,
+                    }}
+                >
+                    {decoration}
+                </View>
+            );
+        }
     }
 
     if (viewportWidth === 0 || viewportHeight === 0) {
@@ -286,7 +313,22 @@ export function IsometricGrid({
                         mapAnimatedStyle,
                     ]}
                 >
-                    {tiles}
+                    {groundTiles}
+                    {/* pointerEvents="none" so taps fall through to the ground tile beneath —
+                     * decorations are purely visual here, tap-to-place is handled by the
+                     * ground layer's onTouchEnd above. */}
+                    <View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: fullDiamondWidth,
+                            height: fullDiamondHeight,
+                        }}
+                    >
+                        {decorationTiles}
+                    </View>
                 </Animated.View>
             </GestureDetector>
         </View>

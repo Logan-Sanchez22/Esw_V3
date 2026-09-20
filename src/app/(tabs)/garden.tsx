@@ -70,32 +70,42 @@ const Garden = () => {
                             cost: 10,
                         })
                     }
-                    renderTile={(index) => {
+                    renderGround={() => (
+                        <AtlasSprite
+                            atlas={isoBlocksAtlas}
+                            sprite="grassFlat"
+                            size={TILE_WIDTH}
+                        />
+                    )}
+                    renderDecoration={(index) => {
                         const placed = state.tiles[index];
+                        if (!placed || !ITEM_SPRITE[placed]) return null;
 
                         return (
                             <View>
+                                {/* Invisible — exists only so this decoration's height/anchor
+                                 math matches a real ground tile's, without duplicating the
+                                 sprite sizing logic. Drawing is handled by the ground pass. */}
                                 <AtlasSprite
                                     atlas={isoBlocksAtlas}
                                     sprite="grassFlat"
                                     size={TILE_WIDTH}
+                                    style={{ opacity: 0 }}
                                 />
 
-                                {placed && ITEM_SPRITE[placed] && (
-                                    <View
-                                        style={{
-                                            position: 'absolute',
-                                            bottom: 0,
-                                            alignSelf: 'center',
-                                        }}
-                                    >
-                                        <AtlasSprite
-                                            atlas={isoDecorationAtlas}
-                                            sprite={ITEM_SPRITE[placed]}
-                                            size={TILE_WIDTH}
-                                        />
-                                    </View>
-                                )}
+                                <View
+                                    style={{
+                                        position: 'absolute',
+                                        bottom: 0,
+                                        alignSelf: 'center',
+                                    }}
+                                >
+                                    <AtlasSprite
+                                        atlas={isoDecorationAtlas}
+                                        sprite={ITEM_SPRITE[placed]}
+                                        size={TILE_WIDTH}
+                                    />
+                                </View>
                             </View>
                         );
                     }}
