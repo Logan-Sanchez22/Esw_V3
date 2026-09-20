@@ -32,7 +32,15 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
-      ]
+      ],
+      ["expo-font", { "fonts": [
+          "./assets/fonts/PlusJakartaSans-Regular.ttf",
+          "./assets/fonts/PlusJakaraSans-Bold.ttf",
+          "./assets/fonts/PlusJakaraSans-Medium.ttf",
+          "./assets/fonts/PlusJakaraSans-SemiBold.ttf",
+          "./assets/fonts/PlusJakaraSans-ExtraBold.ttf",
+          "./assets/fonts/PlusJakaraSans-Light.ttf"
+      ]}]
     ],
     "experiments": {
       "typedRoutes": true,
