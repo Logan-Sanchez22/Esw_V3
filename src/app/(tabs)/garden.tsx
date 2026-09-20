@@ -1,7 +1,10 @@
 import { View, Text, TouchableOpacity } from 'react-native'
 import React from 'react'
 import { styled } from "nativewind";
-import {SafeAreaView as RNSafeAreaView} from "react-native-safe-area-context";
+import {
+    SafeAreaView as RNSafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { IsometricGrid } from '@/components/IsometricGrid';
@@ -9,6 +12,7 @@ import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
 import { GRID_SIZE } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { components } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -20,7 +24,6 @@ const SafeAreaView = styled(RNSafeAreaView);
 const TILE_WIDTH = 60;
 const TILE_HEIGHT_STEP = 28;
 
-const HEADER_HEIGHT = 180;
 
 const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
     tree: 'treeFullGrown',
@@ -30,6 +33,10 @@ const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
 
 const Garden = () => {
     const { state, placeItem, addPoints } = useGardenDomain();
+
+    const insets = useSafeAreaInsets();
+
+    const bottomNavSpace = 100 + insets.bottom;
 
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
@@ -46,26 +53,54 @@ const Garden = () => {
                 </TouchableOpacity>
             </View>
 
-            <IsometricGrid
-                gridSize={GRID_SIZE}
-                tileWidth={TILE_WIDTH}
-                tileHeightStep={TILE_HEIGHT_STEP}
-                onTilePress={(index) => placeItem(index, { id: 'tree', label: 'Tree', cost: 10 })}
-                renderTile={(index) => {
-                    const placed = state.tiles[index];
-                    return (
-                        <View>
-                            {/* Natural, non-stretched size — these tiles are genuinely not square */}
-                            <AtlasSprite atlas={isoBlocksAtlas} sprite="grassFlat" size={TILE_WIDTH} />
-                            {placed && ITEM_SPRITE[placed] && (
-                                <View style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}>
-                                    <AtlasSprite atlas={isoDecorationAtlas} sprite={ITEM_SPRITE[placed]} size={TILE_WIDTH} />
-                                </View>
-                            )}
-                        </View>
-                    );
+            <View
+                style={{
+                    flex: 1,
+                    paddingBottom: bottomNavSpace,
                 }}
-            />
+            >
+                <IsometricGrid
+                    gridSize={GRID_SIZE}
+                    tileWidth={TILE_WIDTH}
+                    tileHeightStep={TILE_HEIGHT_STEP}
+                    onTilePress={(index) =>
+                        placeItem(index, {
+                            id: 'tree',
+                            label: 'Tree',
+                            cost: 10,
+                        })
+                    }
+                    renderTile={(index) => {
+                        const placed = state.tiles[index];
+
+                        return (
+                            <View>
+                                <AtlasSprite
+                                    atlas={isoBlocksAtlas}
+                                    sprite="grassFlat"
+                                    size={TILE_WIDTH}
+                                />
+
+                                {placed && ITEM_SPRITE[placed] && (
+                                    <View
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            alignSelf: 'center',
+                                        }}
+                                    >
+                                        <AtlasSprite
+                                            atlas={isoDecorationAtlas}
+                                            sprite={ITEM_SPRITE[placed]}
+                                            size={TILE_WIDTH}
+                                        />
+                                    </View>
+                                )}
+                            </View>
+                        );
+                    }}
+                />
+            </View>
         </SafeAreaView>
     )
 }
