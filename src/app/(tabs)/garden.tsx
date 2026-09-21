@@ -11,6 +11,7 @@ import { AtlasSprite } from '@/components/AtlasSprite';
 import { IsometricGrid } from '@/components/IsometricGrid';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
+import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
 import {
@@ -178,8 +179,9 @@ const Garden = () => {
                     )}
                     renderDecoration={(index) => {
                         const tile = state.tiles[index];
-                        if (!tile.item || !ITEM_SPRITE[tile.item]) return null;
+                        if (!tile.item) return null;
 
+                        const sprite = ITEM_SPRITE[tile.item];
                         const catalogItem = getCatalogItem(tile.item);
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
 
@@ -203,11 +205,17 @@ const Garden = () => {
                                         alignSelf: 'center',
                                     }}
                                 >
-                                    <AtlasSprite
-                                        atlas={isoDecorationAtlas}
-                                        sprite={ITEM_SPRITE[tile.item]}
-                                        size={decorationSize}
-                                    />
+                                    {sprite ? (
+                                        <AtlasSprite
+                                            atlas={isoDecorationAtlas}
+                                            sprite={sprite}
+                                            size={decorationSize}
+                                        />
+                                    ) : (
+                                        // Placed via the other screen with no iso art yet
+                                        // (e.g. lilyPad, grassTuft) — see UnknownItemMarker.
+                                        <UnknownItemMarker size={decorationSize} />
+                                    )}
                                 </View>
                             </View>
                         );

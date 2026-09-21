@@ -6,6 +6,7 @@ import {SafeAreaView as RNSafeAreaView} from "react-native-safe-area-context";
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
+import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
@@ -158,9 +159,15 @@ const GardenAlt = () => {
                             }}
                         >
                             <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
-                            {deco && (
+                            {tile.item && (
                                 <View style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}>
-                                    <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
+                                    {deco ? (
+                                        <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
+                                    ) : (
+                                        // Placed via the other screen with no top-down art yet
+                                        // (e.g. bench) — see UnknownItemMarker.
+                                        <UnknownItemMarker size={decorationSize} />
+                                    )}
                                 </View>
                             )}
                         </TouchableOpacity>
