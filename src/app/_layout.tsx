@@ -5,6 +5,7 @@ import {useEffect} from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 
 import { GardenDomainProvider } from "@/context/garden-domain-store";
+import { QuestDomainProvider } from "@/context/quest-domain-store";
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -27,7 +28,9 @@ export default function RootLayout() {
   return (
       <GestureHandlerRootView style={{ flex: 1 }}>
         <GardenDomainProvider>
-          <Stack screenOptions={{headerShown: false}} />
+          <QuestDomainProvider>
+            <Stack screenOptions={{headerShown: false}} />
+          </QuestDomainProvider>
         </GardenDomainProvider>
       </GestureHandlerRootView>
   );

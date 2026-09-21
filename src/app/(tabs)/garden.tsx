@@ -1,6 +1,7 @@
-import { View, Text, TouchableOpacity } from 'react-native'
+import { View, Text } from 'react-native'
 import React, { useState } from 'react'
 import { styled } from "nativewind";
+import { Link } from "expo-router";
 import {
     SafeAreaView as RNSafeAreaView,
     useSafeAreaInsets,
@@ -54,7 +55,7 @@ const PICKER_ITEMS: PickerEntry[] = CATALOG.map((item) => ({
 }));
 
 const Garden = () => {
-    const { state, placeItem, addPoints } = useGardenDomain();
+    const { state, placeItem } = useGardenDomain();
     const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
 
     const insets = useSafeAreaInsets();
@@ -67,13 +68,9 @@ const Garden = () => {
                 <Text className="text-xl font-bold text-success mb-2">Isometric Garden</Text>
                 <Text className="text-mutedForeground mb-2">{state.points} pts</Text>
 
-                {/* TEMPORARY — remove once real tasks/points wiring exists. */}
-                <TouchableOpacity
-                    onPress={() => addPoints(10)}
-                    style={{ alignSelf: 'flex-start', backgroundColor: '#234d31', padding: 8, borderRadius: 8 }}
-                >
-                    <Text className="text-mutedForeground">+10 pts (test)</Text>
-                </TouchableOpacity>
+                <Link href="/quest-page" className="text-mutedForeground underline">
+                    Earn more points from Quests →
+                </Link>
             </View>
 
             <ItemPicker
