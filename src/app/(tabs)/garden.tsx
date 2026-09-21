@@ -29,13 +29,20 @@ import { components } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
-// Real measured tile geometry ratio is 30:14 (width:heightStep) — preserved
-// here, just scaled up. At the old size (30/14) the map's total height was
-// only 196px, shorter than any phone screen, so there was nothing to scroll
-// — that's why vertical pan appeared "capped." This size gives ~1350px of
-// vertical map, comfortably taller than any phone viewport.
+// Precisely pixel-measured from blocks.png (grassFlat and soilPlain1 rects,
+// both 30x27 native): the top face's own diamond (top point to bottom point)
+// is exactly 16 native px, i.e. 32 at this screen's 2x scale (TILE_WIDTH=60
+// vs the native rect's 30). An earlier pass here used 28 (an approximate
+// "30:14" measurement) — close enough not to look obviously broken at a
+// glance, but it made every tile's outline sit ~4px inside the sprite's real
+// edge, visible as a thin sliver wherever a color/terrain boundary crosses a
+// tile (confirmed on-device, then verified by compositing the real sprite
+// at both step values before changing this). 32 is the step gridSize tiles
+// are positioned at AND the height tile outlines are drawn at (IsometricGrid
+// reuses tileHeightStep for both) — they must be the same number for a
+// tile's outline to trace its own sprite's real edge.
 const TILE_WIDTH = 60;
-const TILE_HEIGHT_STEP = 28;
+const TILE_HEIGHT_STEP = 32;
 const TILE_OUTLINE_COLOR = '#4A3728';
 const PREVIEW_HIGHLIGHT_COLOR = '#facc15';
 
