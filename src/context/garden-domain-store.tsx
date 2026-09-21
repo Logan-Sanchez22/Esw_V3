@@ -1,6 +1,8 @@
+import { useAuth } from '@clerk/expo';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 
+import { getApiBaseUrl } from '@/lib/api-base-url';
 import {
     addPoints as addPointsToState,
     CatalogItem,
@@ -14,6 +16,10 @@ import {
     placeItem as placeItemInState,
     removeItem as removeItemInState,
 } from '@/lib/garden-domain';
+
+// Debounce for pushing local changes to the server after the initial sync —
+// avoids a network call per tile placement while dragging/painting.
+const PUSH_DEBOUNCE_MS = 1000;
 
 const STORAGE_KEY = 'gryph-gardens:garden-state';
 // Bumped when TileState gained `ground` (was a bare PlacedItemId[] before) —
@@ -66,6 +72,19 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
     // overwrite whatever's in storage with the initial empty garden before
     // the hydration read below has a chance to run.
     const hydrated = useRef(false);
+    // Mirrors `hydrated` as state so the server-sync effect (below) can react
+    // to hydration finishing, without touching the AsyncStorage logic above.
+    const [isHydrated, setIsHydrated] = useState(false);
+
+    const { isLoaded: isAuthLoaded, isSignedIn, userId, getToken } = useAuth();
+    // Which userId the initial pull-or-push has already run for — server
+    // sync is additive on top of AsyncStorage, so this must only happen once
+    // per sign-in, not on every state change.
+    const syncedUserId = useRef<string | null>(null);
+    // Set right after a server pull replaces local state, so the debounced
+    // push effect below doesn't immediately echo it straight back.
+    const skipNextPush = useRef(false);
+    const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     useEffect(() => {
         AsyncStorage.getItem(STORAGE_KEY)
@@ -91,6 +110,7 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
             })
             .finally(() => {
                 hydrated.current = true;
+                setIsHydrated(true);
             });
     }, []);
 
@@ -99,6 +119,87 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         const blob: PersistedGardenBlob = { version: CURRENT_VERSION, state };
         AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(blob)).catch(() => {});
     }, [state]);
+
+    // Initial sync: once signed in (and local storage has been read), pull
+    // the server's garden if one exists, otherwise push the local garden up
+    // as that account's first row. Runs once per userId.
+    useEffect(() => {
+        if (!isAuthLoaded || !isSignedIn || !userId || !isHydrated) return;
+        if (syncedUserId.current === userId) return;
+        syncedUserId.current = userId;
+
+        (async () => {
+            try {
+                const token = await getToken();
+                const baseUrl = getApiBaseUrl();
+                const res = await fetch(`${baseUrl}/api/garden`, {
+                    headers: { Authorization: `Bearer ${token}` },
+                });
+
+                if (res.status === 404) {
+                    await fetch(`${baseUrl}/api/garden`, {
+                        method: 'PUT',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(state),
+                    });
+                    return;
+                }
+
+                if (!res.ok) return;
+
+                const serverState = await res.json();
+                if (isValidGardenState(serverState)) {
+                    skipNextPush.current = true;
+                    setState(serverState);
+                }
+            } catch {
+                // Offline or server unreachable — local AsyncStorage state stands, try again next sign-in.
+            }
+        })();
+    }, [isAuthLoaded, isSignedIn, userId, isHydrated, getToken, state]);
+
+    // Ongoing sync: push local changes up after the initial sync has run,
+    // debounced so rapid placement/painting doesn't fire a request per tile.
+    useEffect(() => {
+        if (!isSignedIn || !userId || syncedUserId.current !== userId) return;
+        if (skipNextPush.current) {
+            skipNextPush.current = false;
+            return;
+        }
+
+        if (pushTimer.current) clearTimeout(pushTimer.current);
+        pushTimer.current = setTimeout(() => {
+            (async () => {
+                try {
+                    const token = await getToken();
+                    const baseUrl = getApiBaseUrl();
+                    await fetch(`${baseUrl}/api/garden`, {
+                        method: 'PUT',
+                        headers: {
+                            Authorization: `Bearer ${token}`,
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify(state),
+                    });
+                } catch {
+                    // Offline or server unreachable — next change (or sign-in) will retry.
+                }
+            })();
+        }, PUSH_DEBOUNCE_MS);
+
+        return () => {
+            if (pushTimer.current) clearTimeout(pushTimer.current);
+        };
+    }, [state, isSignedIn, userId, getToken]);
+
+    // A sign-out clears which user the next sign-in should sync for — otherwise
+    // signing into a different account on the same device would be skipped.
+    useEffect(() => {
+        if (!isSignedIn) syncedUserId.current = null;
+    }, [isSignedIn]);
 
     const placeItem = (index: number, item: CatalogItem) => {
         setState((prev) => placeItemInState(prev, index, item));
