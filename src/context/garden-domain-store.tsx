@@ -26,6 +26,7 @@ type Store = {
     state: GardenDomainState;
     placeItem: (index: number, item: CatalogItem) => void;
     addPoints: (amount: number) => void;
+    resetGarden: () => void;
 };
 
 const GardenDomainContext = createContext<Store | null>(null);
@@ -65,8 +66,12 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         setState((prev) => addPointsToState(prev, amount));
     };
 
+    const resetGarden = () => {
+        setState(createEmptyGarden());
+    };
+
     return (
-        <GardenDomainContext.Provider value={{ state, placeItem, addPoints }}>
+        <GardenDomainContext.Provider value={{ state, placeItem, addPoints, resetGarden }}>
             {children}
         </GardenDomainContext.Provider>
     );

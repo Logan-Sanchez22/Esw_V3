@@ -20,6 +20,7 @@ type Store = {
     state: QuestDomainState;
     completeQuest: (questId: string) => void;
     isCompleted: (questId: string) => boolean;
+    resetQuests: () => void;
 };
 
 const QuestDomainContext = createContext<Store | null>(null);
@@ -56,8 +57,12 @@ export function QuestDomainProvider({ children }: { children: ReactNode }) {
 
     const isCompleted = (questId: string) => isQuestCompleted(state, questId);
 
+    const resetQuests = () => {
+        setState(createEmptyQuestState());
+    };
+
     return (
-        <QuestDomainContext.Provider value={{ state, completeQuest, isCompleted }}>
+        <QuestDomainContext.Provider value={{ state, completeQuest, isCompleted, resetQuests }}>
             {children}
         </QuestDomainContext.Provider>
     );
