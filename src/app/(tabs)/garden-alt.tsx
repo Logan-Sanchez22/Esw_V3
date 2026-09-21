@@ -187,6 +187,7 @@ const GardenAlt = () => {
 
                                     const block = getPlacementBlock(state, i, item);
                                     if (block === 'occupied') showMessage('Tile already has something — remove it first');
+                                    else if (block === 'non-placeable-terrain') showMessage("Can't place on water");
                                     else if (block === 'insufficient-points') showMessage('Not enough points');
                                     else setPreviewIndex(i);
                                 }}

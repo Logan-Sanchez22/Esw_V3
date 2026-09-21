@@ -26,15 +26,17 @@ type Props = {
     renderDecoration?: (index: number, row: number, col: number) => ReactNode | null | undefined;
     onTilePress?: (index: number, row: number, col: number) => void;
     /**
-     * Height (top point to bottom point, in the same rendered pixels as
-     * tileWidth) of the ground sprite's flat TOP FACE diamond — this tile
-     * set draws each tile as a pseudo-3D block (flat top + shaded sides), so
-     * the top face is shorter than the full sprite. Pixel-measured per atlas,
-     * not derived from tileHeightStep (that's the grid's row/col overlap
-     * step, a different number). Omit to skip drawing tile outlines.
+     * Outline color drawn on every tile's diamond edge — traces the LOGICAL
+     * grid cell (tileWidth x tileHeightStep, the same step used to position
+     * tiles above), not the ground sprite's own drawn pixel bounds. This tile
+     * set's sprites draw each tile as a pseudo-3D block (flat top + shaded
+     * sides) whose top face is intentionally taller than tileHeightStep, so
+     * adjacent tiles' art overlaps slightly for a seamless floor — outlining
+     * that raw sprite height instead of the grid step makes neighboring
+     * outlines overlap too, which shows up as double/crossing lines (this
+     * was a real bug here once; verified by simulating both against a
+     * multi-tile grid before fixing). Omit to skip drawing tile outlines.
      */
-    topFaceHeight?: number;
-    /** Outline color drawn on every tile's top-face diamond edge. */
     tileOutlineColor?: string;
     /** Index of one tile to outline with highlightColor instead (e.g. a placement preview). */
     highlightIndex?: number | null;
@@ -65,7 +67,6 @@ export function IsometricGrid({
                                   renderGround,
                                   renderDecoration,
                                   onTilePress,
-                                  topFaceHeight,
                                   tileOutlineColor,
                                   highlightIndex,
                                   highlightColor,
@@ -278,7 +279,7 @@ export function IsometricGrid({
             </View>
         );
 
-        if (topFaceHeight && (tileOutlineColor || index === highlightIndex)) {
+        if (tileOutlineColor || index === highlightIndex) {
             const isHighlight = index === highlightIndex;
 
             groundTiles.push(
@@ -290,12 +291,12 @@ export function IsometricGrid({
                         left: x,
                         top: y,
                         width: tileWidth,
-                        height: topFaceHeight,
+                        height: tileHeightStep,
                     }}
                 >
-                    <Svg width={tileWidth} height={topFaceHeight}>
+                    <Svg width={tileWidth} height={tileHeightStep}>
                         <Polygon
-                            points={`${tileWidth / 2},0 ${tileWidth},${topFaceHeight / 2} ${tileWidth / 2},${topFaceHeight} 0,${topFaceHeight / 2}`}
+                            points={`${tileWidth / 2},0 ${tileWidth},${tileHeightStep / 2} ${tileWidth / 2},${tileHeightStep} 0,${tileHeightStep / 2}`}
                             fill="none"
                             stroke={isHighlight ? highlightColor : tileOutlineColor}
                             strokeWidth={isHighlight ? 2 : 1}

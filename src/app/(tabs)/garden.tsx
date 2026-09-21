@@ -36,13 +36,6 @@ const SafeAreaView = styled(RNSafeAreaView);
 // vertical map, comfortably taller than any phone viewport.
 const TILE_WIDTH = 60;
 const TILE_HEIGHT_STEP = 28;
-// Pixel-measured from blocks.png (grassFlat and soilPlain1 rects, both 30x27
-// native): each tile is a pseudo-3D block — flat top diamond + shaded sides —
-// and the top face's own height (top point to bottom point) is 16 native
-// px, i.e. 32 at this screen's 2x (TILE_WIDTH=60 vs the native rect's 30)
-// scale. Not the same number as TILE_HEIGHT_STEP, which is the grid's
-// row/col overlap step, not a sprite measurement.
-const TOP_FACE_HEIGHT = 32;
 const TILE_OUTLINE_COLOR = '#4A3728';
 const PREVIEW_HIGHLIGHT_COLOR = '#facc15';
 
@@ -169,7 +162,6 @@ const Garden = () => {
                     gridSize={GRID_SIZE}
                     tileWidth={TILE_WIDTH}
                     tileHeightStep={TILE_HEIGHT_STEP}
-                    topFaceHeight={TOP_FACE_HEIGHT}
                     tileOutlineColor={TILE_OUTLINE_COLOR}
                     highlightIndex={previewIndex}
                     highlightColor={PREVIEW_HIGHLIGHT_COLOR}
@@ -190,6 +182,7 @@ const Garden = () => {
 
                         const block = getPlacementBlock(state, index, item);
                         if (block === 'occupied') showMessage('Tile already has something — remove it first');
+                        else if (block === 'non-placeable-terrain') showMessage("Can't place on water");
                         else if (block === 'insufficient-points') showMessage('Not enough points');
                         else setPreviewIndex(index);
                     }}

@@ -42,7 +42,9 @@ export function createEmptyGarden(): GardenDomainState {
 
 export function canPlace(state: GardenDomainState, index: number, item: CatalogItem): boolean {
   if (index < 0 || index >= state.tiles.length) return false;
-  if (state.tiles[index].item !== null) return false;
+  const tile = state.tiles[index];
+  if (tile.item !== null) return false;
+  if (!isGroundPlaceable(tile.ground)) return false;
   return state.points >= item.cost;
 }
 
@@ -79,7 +81,7 @@ export function paintGround(state: GardenDomainState, index: number, groundId: s
   return { ...state, tiles };
 }
 
-export type PlacementBlock = 'occupied' | 'insufficient-points' | null;
+export type PlacementBlock = 'occupied' | 'non-placeable-terrain' | 'insufficient-points' | null;
 
 /** Why a placement would fail, for UI feedback — canPlace() collapses this to a bool. */
 export function getPlacementBlock(
@@ -88,7 +90,9 @@ export function getPlacementBlock(
   item: CatalogItem
 ): PlacementBlock {
   if (index < 0 || index >= state.tiles.length) return 'occupied';
-  if (state.tiles[index].item !== null) return 'occupied';
+  const tile = state.tiles[index];
+  if (tile.item !== null) return 'occupied';
+  if (!isGroundPlaceable(tile.ground)) return 'non-placeable-terrain';
   if (state.points < item.cost) return 'insufficient-points';
   return null;
 }
@@ -128,6 +132,14 @@ export const REMOVE_TOOL_ID = '__remove__';
 export type GroundOption = {
   id: string;
   label: string;
+  /**
+   * Whether a decoration can be placed on this ground type. Defaults to
+   * `true` (see getGroundOption/isGroundPlaceable) so future ground types
+   * don't need to remember to opt in — only terrain that actually blocks
+   * placement (water today; rock/building-footprint etc. later) needs to
+   * set this false.
+   */
+  placeable?: boolean;
 };
 
 /**
@@ -139,6 +151,15 @@ export type GroundOption = {
 export const GROUND_CATALOG: GroundOption[] = [
   { id: 'grass', label: 'Grass' },
   { id: 'dirt', label: 'Dirt' },
-  { id: 'water', label: 'Water' },
+  { id: 'water', label: 'Water', placeable: false },
   { id: 'stonePath', label: 'Stone Path' },
 ];
+
+export function getGroundOption(id: string): GroundOption | undefined {
+  return GROUND_CATALOG.find((ground) => ground.id === id);
+}
+
+/** Unknown ground ids default placeable — matches this game's behavior before terrain rules existed. */
+export function isGroundPlaceable(groundId: string): boolean {
+  return getGroundOption(groundId)?.placeable ?? true;
+}
