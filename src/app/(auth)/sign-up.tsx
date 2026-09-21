@@ -15,84 +15,69 @@ const inputStyle = {
     borderRadius: 8,
     padding: 12,
     color: '#ECFDF5',
-    marginBottom: 12,
+    marginBottom: 8,
 } as const;
 
+const emailLooksValid = (value: string) => value.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
 const SignUp = () => {
-    const { signUp } = useSignUp();
+    const { signUp, errors, fetchStatus } = useSignUp();
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
+    const [emailTouched, setEmailTouched] = useState(false);
     const [pendingVerification, setPendingVerification] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-    const [submitting, setSubmitting] = useState(false);
+    const [genericError, setGenericError] = useState<string | null>(null);
 
-    const onSubmitDetails = async () => {
-        if (!signUp) return;
-        setError(null);
-        setSubmitting(true);
+    const submitting = fetchStatus === 'fetching';
+    const emailValid = emailLooksValid(emailAddress);
 
-        try {
-            const { error: passwordError } = await signUp.password({ emailAddress, password });
-            if (passwordError) {
-                setError(passwordError.message ?? 'Could not create account.');
-                return;
-            }
-
-            if (signUp.status === 'complete') {
-                const { error: finalizeError } = await signUp.finalize();
-                if (finalizeError) {
-                    setError(finalizeError.message ?? 'Could not complete sign-up.');
+    const completeSignUp = async () => {
+        const { error } = await signUp.finalize({
+            navigate: async ({ session }) => {
+                if (session.currentTask) {
+                    setGenericError('Additional account setup is required (not supported in this app yet).');
                     return;
                 }
                 router.replace('/(tabs)');
-                return;
-            }
+            },
+        });
+        if (error) setGenericError(error.message ?? 'Could not complete sign-up.');
+    };
 
-            // Most Clerk apps require email verification before completing —
-            // handle it generically rather than assuming it's on or off.
-            if (signUp.unverifiedFields.includes('email_address')) {
-                const { error: codeError } = await signUp.verifications.sendEmailCode();
-                if (codeError) {
-                    setError(codeError.message ?? 'Could not send verification code.');
-                    return;
-                }
-                setPendingVerification(true);
-                return;
-            }
+    const onSubmitDetails = async () => {
+        if (!emailAddress || !password || !emailValid) return;
+        setGenericError(null);
 
-            setError(`Sign-up needs an additional step (${signUp.status}) not supported here yet.`);
-        } finally {
-            setSubmitting(false);
+        const { error } = await signUp.password({ emailAddress, password });
+        if (error) return; // field-specific messages come from `errors` below
+
+        if (signUp.status === 'complete') {
+            await completeSignUp();
+            return;
         }
+
+        // Most Clerk apps require email verification before completing —
+        // handle it generically rather than assuming it's on or off.
+        if (signUp.unverifiedFields.includes('email_address')) {
+            const { error: codeError } = await signUp.verifications.sendEmailCode();
+            if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
+            else setPendingVerification(true);
+            return;
+        }
+
+        setGenericError(`Sign-up needs an additional step (${signUp.status}) not supported here yet.`);
     };
 
     const onSubmitCode = async () => {
-        if (!signUp) return;
-        setError(null);
-        setSubmitting(true);
+        setGenericError(null);
+        const { error } = await signUp.verifications.verifyEmailCode({ code });
+        if (error) return;
 
-        try {
-            const { error: verifyError } = await signUp.verifications.verifyEmailCode({ code });
-            if (verifyError) {
-                setError(verifyError.message ?? 'Invalid code.');
-                return;
-            }
-
-            if (signUp.status !== 'complete') {
-                setError(`Sign-up needs an additional step (${signUp.status}) not supported here yet.`);
-                return;
-            }
-
-            const { error: finalizeError } = await signUp.finalize();
-            if (finalizeError) {
-                setError(finalizeError.message ?? 'Could not complete sign-up.');
-                return;
-            }
-
-            router.replace('/(tabs)');
-        } finally {
-            setSubmitting(false);
+        if (signUp.status === 'complete') {
+            await completeSignUp();
+        } else {
+            setGenericError(`Sign-up needs an additional step (${signUp.status}) not supported here yet.`);
         }
     };
 
@@ -114,8 +99,8 @@ const SignUp = () => {
                         onChangeText={setCode}
                         style={inputStyle}
                     />
-
-                    {error && <Text className="text-warning mb-3">{error}</Text>}
+                    {errors.fields.code && <Text className="text-warning mb-2">{errors.fields.code.message}</Text>}
+                    {genericError && <Text className="text-warning mb-3">{genericError}</Text>}
 
                     <TouchableOpacity
                         disabled={submitting || !code}
@@ -145,34 +130,47 @@ const SignUp = () => {
                 <TextInput
                     autoCapitalize="none"
                     keyboardType="email-address"
+                    autoComplete="email"
                     placeholder="Email"
                     placeholderTextColor="#6EE7B7"
                     value={emailAddress}
                     onChangeText={setEmailAddress}
+                    onBlur={() => setEmailTouched(true)}
                     style={inputStyle}
                 />
+                {emailTouched && !emailValid && (
+                    <Text className="text-warning mb-2">Please enter a valid email address</Text>
+                )}
+                {errors.fields.emailAddress && (
+                    <Text className="text-warning mb-2">{errors.fields.emailAddress.message}</Text>
+                )}
 
                 <TextInput
                     autoCapitalize="none"
                     secureTextEntry
+                    autoComplete="password-new"
                     placeholder="Password"
                     placeholderTextColor="#6EE7B7"
                     value={password}
                     onChangeText={setPassword}
                     style={inputStyle}
                 />
+                {errors.fields.password && (
+                    <Text className="text-warning mb-2">{errors.fields.password.message}</Text>
+                )}
 
-                {error && <Text className="text-warning mb-3">{error}</Text>}
+                {genericError && <Text className="text-warning mb-3">{genericError}</Text>}
 
                 <TouchableOpacity
-                    disabled={submitting || !emailAddress || !password}
+                    disabled={submitting || !emailAddress || !password || !emailValid}
                     onPress={onSubmitDetails}
                     style={{
                         backgroundColor: '#34D399',
                         borderRadius: 8,
                         padding: 14,
                         alignItems: 'center',
-                        opacity: submitting || !emailAddress || !password ? 0.5 : 1,
+                        opacity: submitting || !emailAddress || !password || !emailValid ? 0.5 : 1,
+                        marginTop: 8,
                         marginBottom: 16,
                     }}
                 >
