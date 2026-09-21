@@ -1,5 +1,5 @@
 import { ReactNode } from 'react';
-import { ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, Text, TouchableOpacity } from 'react-native';
 
 /**
  * Generic "what am I about to place" bar — a horizontal row of tappable
@@ -40,24 +40,20 @@ export function ItemPicker({ items, selectedId, onSelect, points }: Props) {
                         onPress={() => onSelect(item.id)}
                         style={{
                             alignItems: 'center',
-                            justifyContent: 'flex-end',
                             width: 64,
-                            height: 72,
                             borderRadius: 10,
                             borderWidth: selected ? 2 : 1,
                             borderColor: selected ? '#facc15' : 'rgba(255,255,255,0.15)',
                             backgroundColor: 'rgba(0,0,0,0.25)',
                             opacity: affordable ? 1 : 0.4,
-                            paddingBottom: 4,
+                            paddingVertical: 8,
                         }}
                     >
-                        <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-                            {item.icon}
-                        </View>
-                        <Text numberOfLines={1} style={{ fontSize: 10, color: 'white' }}>
+                        {item.icon}
+                        <Text numberOfLines={1} style={{ fontSize: 10, color: 'white', marginTop: 4 }}>
                             {item.label}
                         </Text>
-                        <Text style={{ fontSize: 10, color: '#facc15' }}>
+                        <Text style={{ fontSize: 10, color: '#facc15', marginTop: 2 }}>
                             {item.cost > 0 ? `${item.cost} pts` : 'Free'}
                         </Text>
                     </TouchableOpacity>

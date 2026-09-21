@@ -1,11 +1,15 @@
 import { View, Text, TouchableOpacity } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { styled } from "nativewind";
-import {SafeAreaView as RNSafeAreaView} from "react-native-safe-area-context";
+import {
+    SafeAreaView as RNSafeAreaView,
+    useSafeAreaInsets,
+} from "react-native-safe-area-context";
 
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
+import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
@@ -104,6 +108,17 @@ const GardenAlt = () => {
     const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
     const { message, showMessage } = useStatusMessage();
+    const insets = useSafeAreaInsets();
+    const bottomNavSpace = 100 + insets.bottom;
+
+    // Which tile is showing a pending (unconfirmed) decoration ghost —
+    // pure UI state, never touches domain state until Confirm is tapped.
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+    // A stale ghost must never keep showing once what's selected changes.
+    useEffect(() => {
+        setPreviewIndex(null);
+    }, [selectedItemId, mode]);
 
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
@@ -131,56 +146,87 @@ const GardenAlt = () => {
                 />
             )}
 
-            <PannableGrid
-                gridSize={GRID_SIZE}
-                tileSize={TILE_SIZE}
-                headerHeight={HEADER_HEIGHT}
-                renderTile={(i) => {
-                    const tile = state.tiles[i];
-                    const deco = tile.item ? ITEM_SPRITE[tile.item as keyof typeof ITEM_SPRITE] : null;
-                    const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
-                    const decorationSize = TILE_SIZE * (tile.item ? getCatalogItem(tile.item)?.visualScale ?? 1 : 1);
+            <View style={{ flex: 1 }}>
+                <PannableGrid
+                    gridSize={GRID_SIZE}
+                    tileSize={TILE_SIZE}
+                    headerHeight={HEADER_HEIGHT}
+                    renderTile={(i) => {
+                        const tile = state.tiles[i];
+                        const isPreview = i === previewIndex;
+                        const itemId = isPreview ? selectedItemId : tile.item;
+                        const deco = itemId ? ITEM_SPRITE[itemId as keyof typeof ITEM_SPRITE] : null;
+                        const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
+                        const decorationSize = TILE_SIZE * (itemId ? getCatalogItem(itemId)?.visualScale ?? 1 : 1);
 
-                    return (
-                        <TouchableOpacity
-                            style={{ width: TILE_SIZE, height: TILE_SIZE }}
-                            onPress={() => {
-                                if (mode === 'paint') {
-                                    paintGround(i, selectedGroundId);
-                                    return;
-                                }
+                        return (
+                            <TouchableOpacity
+                                style={{
+                                    width: TILE_SIZE,
+                                    height: TILE_SIZE,
+                                    borderWidth: isPreview ? 2 : 1,
+                                    borderColor: isPreview ? '#facc15' : 'rgba(0,0,0,0.18)',
+                                    // Border eats into the content box (RN sizing is border-box) —
+                                    // clip so the fixed-size ground sprite doesn't spill past it.
+                                    overflow: 'hidden',
+                                }}
+                                onPress={() => {
+                                    if (mode === 'paint') {
+                                        paintGround(i, selectedGroundId);
+                                        return;
+                                    }
 
-                                if (selectedItemId === REMOVE_TOOL_ID) {
-                                    if (tile.item === null) showMessage('Nothing to remove here');
-                                    else removeItem(i);
-                                    return;
-                                }
+                                    if (selectedItemId === REMOVE_TOOL_ID) {
+                                        if (tile.item === null) showMessage('Nothing to remove here');
+                                        else removeItem(i);
+                                        return;
+                                    }
 
-                                const item = getCatalogItem(selectedItemId);
-                                if (!item) return;
+                                    const item = getCatalogItem(selectedItemId);
+                                    if (!item) return;
 
-                                const block = getPlacementBlock(state, i, item);
-                                if (block === 'occupied') showMessage('Tile already has something — remove it first');
-                                else if (block === 'insufficient-points') showMessage('Not enough points');
-                                else placeItem(i, item);
-                            }}
-                        >
-                            <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
-                            {tile.item && (
-                                <View style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}>
-                                    {deco ? (
-                                        <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
-                                    ) : (
-                                        // Placed via the other screen with no top-down art yet
-                                        // (e.g. bench) — see UnknownItemMarker.
-                                        <UnknownItemMarker size={decorationSize} />
-                                    )}
-                                </View>
-                            )}
-                        </TouchableOpacity>
-                    );
-                }}
-            />
+                                    const block = getPlacementBlock(state, i, item);
+                                    if (block === 'occupied') showMessage('Tile already has something — remove it first');
+                                    else if (block === 'insufficient-points') showMessage('Not enough points');
+                                    else setPreviewIndex(i);
+                                }}
+                            >
+                                <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
+                                {itemId && (
+                                    <View
+                                        style={{
+                                            position: 'absolute',
+                                            bottom: 0,
+                                            alignSelf: 'center',
+                                            opacity: isPreview ? 0.55 : 1,
+                                        }}
+                                    >
+                                        {deco ? (
+                                            <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
+                                        ) : (
+                                            // Placed via the other screen with no top-down art yet
+                                            // (e.g. bench) — see UnknownItemMarker.
+                                            <UnknownItemMarker size={decorationSize} />
+                                        )}
+                                    </View>
+                                )}
+                            </TouchableOpacity>
+                        );
+                    }}
+                />
+                {previewIndex !== null && (
+                    <PlacementConfirmBar
+                        itemLabel={getCatalogItem(selectedItemId)?.label ?? 'item'}
+                        bottom={bottomNavSpace + 12}
+                        onConfirm={() => {
+                            const item = getCatalogItem(selectedItemId);
+                            if (item && previewIndex !== null) placeItem(previewIndex, item);
+                            setPreviewIndex(null);
+                        }}
+                        onCancel={() => setPreviewIndex(null)}
+                    />
+                )}
+            </View>
         </SafeAreaView>
     )
 }

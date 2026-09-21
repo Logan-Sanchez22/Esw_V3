@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native'
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { styled } from "nativewind";
 import { Link } from "expo-router";
 import {
@@ -11,6 +11,7 @@ import { AtlasSprite } from '@/components/AtlasSprite';
 import { IsometricGrid } from '@/components/IsometricGrid';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
+import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
@@ -109,6 +110,15 @@ const Garden = () => {
 
     const bottomNavSpace = 100 + insets.bottom;
 
+    // Which tile is showing a pending (unconfirmed) decoration ghost —
+    // pure UI state, never touches domain state until Confirm is tapped.
+    const [previewIndex, setPreviewIndex] = useState<number | null>(null);
+
+    // A stale ghost must never keep showing once what's selected changes.
+    useEffect(() => {
+        setPreviewIndex(null);
+    }, [selectedItemId, mode]);
+
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
@@ -168,7 +178,7 @@ const Garden = () => {
                         const block = getPlacementBlock(state, index, item);
                         if (block === 'occupied') showMessage('Tile already has something — remove it first');
                         else if (block === 'insufficient-points') showMessage('Not enough points');
-                        else placeItem(index, item);
+                        else setPreviewIndex(index);
                     }}
                     renderGround={(index) => (
                         <AtlasSprite
@@ -179,14 +189,16 @@ const Garden = () => {
                     )}
                     renderDecoration={(index) => {
                         const tile = state.tiles[index];
-                        if (!tile.item) return null;
+                        const isPreview = index === previewIndex;
+                        const itemId = isPreview ? selectedItemId : tile.item;
+                        if (!itemId) return null;
 
-                        const sprite = ITEM_SPRITE[tile.item];
-                        const catalogItem = getCatalogItem(tile.item);
+                        const sprite = ITEM_SPRITE[itemId];
+                        const catalogItem = getCatalogItem(itemId);
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
 
                         return (
-                            <View>
+                            <View style={isPreview ? { opacity: 0.55 } : undefined}>
                                 {/* Invisible — exists only so this decoration's height/anchor
                                  math matches this tile's own ground sprite's, without
                                  duplicating the sprite sizing logic. Drawing is handled by
@@ -221,6 +233,18 @@ const Garden = () => {
                         );
                     }}
                 />
+                {previewIndex !== null && (
+                    <PlacementConfirmBar
+                        itemLabel={getCatalogItem(selectedItemId)?.label ?? 'item'}
+                        bottom={bottomNavSpace + 12}
+                        onConfirm={() => {
+                            const item = getCatalogItem(selectedItemId);
+                            if (item && previewIndex !== null) placeItem(previewIndex, item);
+                            setPreviewIndex(null);
+                        }}
+                        onCancel={() => setPreviewIndex(null)}
+                    />
+                )}
             </View>
         </SafeAreaView>
     )
