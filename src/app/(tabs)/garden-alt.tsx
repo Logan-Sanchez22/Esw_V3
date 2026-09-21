@@ -10,7 +10,7 @@ import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
-import { topDownProps32Atlas } from '@/lib/atlases/topdown-props-atlas';
+import { topDownProps32Atlas, topDownProps48Atlas } from '@/lib/atlases/topdown-props-atlas';
 import { topDownSmall16Atlas, topDownTuft16x32Atlas } from '@/lib/atlases/topdown-small-atlas';
 import {
     CATALOG,
@@ -42,7 +42,14 @@ const MODE_OPTIONS = [
 // the handoff notes top-down ground/decoration coverage lags the iso set.
 const ITEM_SPRITE = {
     tree: { atlas: topDownTreesAtlas, key: 'treeCherryPink' as const },
-    treeBare: { atlas: topDownTreesAtlas, key: 'treeTeal' as const },
+    // treeTeal (topDownTreesAtlas) turned out to be a flat, low-detail round
+    // canopy silhouette — confirmed on-device it reads as an unrecognizable
+    // blob at decoration size, and doesn't look like a "bare tree" at all.
+    // A stump is a much more honest fit for that concept, and has real
+    // wood-grain detail that survives being scaled down. stumpSmall (32x32,
+    // topDownProps32Atlas) stays available for a future distinct catalog
+    // item if wanted.
+    treeBare: { atlas: topDownProps48Atlas, key: 'stumpBig' as const },
     bush: { atlas: topDownProps32Atlas, key: 'flowerBushOrange' as const },
     bushAlt: { atlas: topDownProps32Atlas, key: 'flowerBushYellow' as const },
     flower: { atlas: topDownSmall16Atlas, key: 'tulipPink' as const },

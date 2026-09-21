@@ -42,19 +42,21 @@ const Settings = () => {
 
     return (
         <SafeAreaView className="flex-1 bg-background p-5">
-            <Text className="text-xl font-bold text-success mb-2">Settings</Text>
-            {user?.primaryEmailAddress && (
-                <Text className="text-mutedForeground mb-6">
-                    Signed in as {user.primaryEmailAddress.emailAddress}
-                </Text>
-            )}
+            <View>
+                <Text className="text-xl font-bold text-success mb-2">Settings</Text>
+                {user?.primaryEmailAddress && (
+                    <Text className="text-mutedForeground mb-6">
+                        Signed in as {user.primaryEmailAddress.emailAddress}
+                    </Text>
+                )}
 
-            <Text className="text-mutedForeground mb-1">
-                {gardenState.points} pts · {questState.completedQuestIds.length}/{QUESTS.length} quests completed
-            </Text>
-            <Text className="text-mutedForeground mb-6">
-                Garden and quest progress is saved on this device.
-            </Text>
+                <Text className="text-mutedForeground mb-1">
+                    {gardenState.points} pts · {questState.completedQuestIds.length}/{QUESTS.length} quests completed
+                </Text>
+                <Text className="text-mutedForeground mb-6">
+                    Garden and quest progress is saved on this device.
+                </Text>
+            </View>
 
             <View>
                 <DangerButton
