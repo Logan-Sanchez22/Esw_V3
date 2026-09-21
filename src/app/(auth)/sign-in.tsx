@@ -177,7 +177,10 @@ const SignIn = () => {
                     </Text>
                 </TouchableOpacity>
 
-                <Link href={"/(auth)/sign-up"} className="text-mutedForeground underline text-center">
+                <Link
+                    href={"/(auth)/sign-up"}
+                    style={{ color: '#6EE7B7', textDecorationLine: 'underline', textAlign: 'center' }}
+                >
                     Create account
                 </Link>
             </KeyboardAwareForm>

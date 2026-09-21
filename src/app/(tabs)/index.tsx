@@ -11,8 +11,20 @@ export default function App() {
         <Text className="text-7xl font-sans-extrabold text-error">
           Home
         </Text>
-        <Link href="/onboarding" className="mt-4 font-sans-bold rounded bg-primary
-        text-white p-4">Go to onboarding</Link>
+        <Link
+            href="/onboarding"
+            style={{
+                marginTop: 16,
+                fontFamily: 'sans-bold',
+                borderRadius: 4,
+                backgroundColor: '#34D399',
+                color: 'white',
+                padding: 16,
+                overflow: 'hidden',
+            }}
+        >
+            Go to onboarding
+        </Link>
       </SafeAreaView>
   );
 }

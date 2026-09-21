@@ -115,7 +115,7 @@ const Garden = () => {
                 <Text className="text-xl font-bold text-success mb-2">Isometric Garden</Text>
                 <Text className="text-mutedForeground mb-2">{state.points} pts</Text>
 
-                <Link href="/quest-page" className="text-mutedForeground underline">
+                <Link href="/quest-page" style={{ color: '#6EE7B7', textDecorationLine: 'underline' }}>
                     Earn more points from Quests →
                 </Link>
 
