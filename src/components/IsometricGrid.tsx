@@ -6,6 +6,7 @@ import Animated, {
     useAnimatedStyle,
     useSharedValue,
 } from 'react-native-reanimated';
+import Svg, { Polygon } from 'react-native-svg';
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 4;
@@ -24,6 +25,20 @@ type Props = {
      * by row+col among themselves so two decorations still occlude each other correctly. */
     renderDecoration?: (index: number, row: number, col: number) => ReactNode | null | undefined;
     onTilePress?: (index: number, row: number, col: number) => void;
+    /**
+     * Height (top point to bottom point, in the same rendered pixels as
+     * tileWidth) of the ground sprite's flat TOP FACE diamond — this tile
+     * set draws each tile as a pseudo-3D block (flat top + shaded sides), so
+     * the top face is shorter than the full sprite. Pixel-measured per atlas,
+     * not derived from tileHeightStep (that's the grid's row/col overlap
+     * step, a different number). Omit to skip drawing tile outlines.
+     */
+    topFaceHeight?: number;
+    /** Outline color drawn on every tile's top-face diamond edge. */
+    tileOutlineColor?: string;
+    /** Index of one tile to outline with highlightColor instead (e.g. a placement preview). */
+    highlightIndex?: number | null;
+    highlightColor?: string;
 };
 
 function clampAxis(
@@ -50,6 +65,10 @@ export function IsometricGrid({
                                   renderGround,
                                   renderDecoration,
                                   onTilePress,
+                                  topFaceHeight,
+                                  tileOutlineColor,
+                                  highlightIndex,
+                                  highlightColor,
                               }: Props) {
     const [viewport, setViewport] = useState({
         width: 0,
@@ -258,6 +277,33 @@ export function IsometricGrid({
                 {renderGround(index, row, col)}
             </View>
         );
+
+        if (topFaceHeight && (tileOutlineColor || index === highlightIndex)) {
+            const isHighlight = index === highlightIndex;
+
+            groundTiles.push(
+                <View
+                    key={`outline-${index}`}
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        left: x,
+                        top: y,
+                        width: tileWidth,
+                        height: topFaceHeight,
+                    }}
+                >
+                    <Svg width={tileWidth} height={topFaceHeight}>
+                        <Polygon
+                            points={`${tileWidth / 2},0 ${tileWidth},${topFaceHeight / 2} ${tileWidth / 2},${topFaceHeight} 0,${topFaceHeight / 2}`}
+                            fill="none"
+                            stroke={isHighlight ? highlightColor : tileOutlineColor}
+                            strokeWidth={isHighlight ? 2 : 1}
+                        />
+                    </Svg>
+                </View>
+            );
+        }
 
         const decoration = renderDecoration?.(index, row, col);
 

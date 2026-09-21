@@ -165,7 +165,7 @@ const GardenAlt = () => {
                                     width: TILE_SIZE,
                                     height: TILE_SIZE,
                                     borderWidth: isPreview ? 2 : 1,
-                                    borderColor: isPreview ? '#facc15' : 'rgba(0,0,0,0.18)',
+                                    borderColor: isPreview ? '#facc15' : '#4A3728',
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',
