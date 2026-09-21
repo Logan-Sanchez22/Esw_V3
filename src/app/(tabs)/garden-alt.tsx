@@ -128,6 +128,7 @@ const GardenAlt = () => {
                     const tile = state.tiles[i];
                     const deco = tile.item ? ITEM_SPRITE[tile.item as keyof typeof ITEM_SPRITE] : null;
                     const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
+                    const decorationSize = TILE_SIZE * (tile.item ? getCatalogItem(tile.item)?.visualScale ?? 1 : 1);
 
                     return (
                         <TouchableOpacity
@@ -155,8 +156,8 @@ const GardenAlt = () => {
                         >
                             <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
                             {deco && (
-                                <View style={{ position: 'absolute', bottom: 0 }}>
-                                    <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={TILE_SIZE} />
+                                <View style={{ position: 'absolute', bottom: 0, alignSelf: 'center' }}>
+                                    <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
                                 </View>
                             )}
                         </TouchableOpacity>

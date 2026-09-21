@@ -15,6 +15,17 @@ export type CatalogItem = {
   id: string;
   label: string;
   cost: number;
+  /**
+   * How big this should render relative to a full tile (1 = fills the tile
+   * like a tree does). Every decoration used to render at a flat tile-sized
+   * box regardless of the source art's real proportions — AtlasSprite's
+   * fit="contain" normalizes by the sprite's own longer dimension, so a 7px
+   * flower and a 128px tree both got blown up to the same box. Same meaning
+   * on both screens; each multiplies its own base tile size by this.
+   * Starting values are a rough first pass, not measured — expect to retune
+   * once these are visible on a device.
+   */
+  visualScale?: number;
 };
 
 export type GardenDomainState = {
@@ -90,15 +101,15 @@ export function getPlacementBlock(
  * has art in every atlas yet, so a screen may only show a subset of this list.
  */
 export const CATALOG: CatalogItem[] = [
-  { id: 'tree', label: 'Tree', cost: 12 },
-  { id: 'treeBare', label: 'Bare Tree', cost: 8 },
-  { id: 'bush', label: 'Bush', cost: 5 },
-  { id: 'bushAlt', label: 'Bush', cost: 5 },
-  { id: 'flower', label: 'Flowers', cost: 2 },
-  { id: 'mushroom', label: 'Mushroom', cost: 3 },
-  { id: 'rock', label: 'Rock', cost: 4 },
-  { id: 'log', label: 'Log', cost: 3 },
-  { id: 'bench', label: 'Bench', cost: 15 },
+  { id: 'tree', label: 'Tree', cost: 12, visualScale: 1 },
+  { id: 'treeBare', label: 'Bare Tree', cost: 8, visualScale: 0.9 },
+  { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55 },
+  { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55 },
+  { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35 },
+  { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3 },
+  { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5 },
+  { id: 'log', label: 'Log', cost: 3, visualScale: 0.5 },
+  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7 },
 ];
 
 export function getCatalogItem(id: string): CatalogItem | undefined {

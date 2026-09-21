@@ -179,6 +179,9 @@ const Garden = () => {
                         const tile = state.tiles[index];
                         if (!tile.item || !ITEM_SPRITE[tile.item]) return null;
 
+                        const catalogItem = getCatalogItem(tile.item);
+                        const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
+
                         return (
                             <View>
                                 {/* Invisible — exists only so this decoration's height/anchor
@@ -202,7 +205,7 @@ const Garden = () => {
                                     <AtlasSprite
                                         atlas={isoDecorationAtlas}
                                         sprite={ITEM_SPRITE[tile.item]}
-                                        size={TILE_WIDTH}
+                                        size={decorationSize}
                                     />
                                 </View>
                             </View>
