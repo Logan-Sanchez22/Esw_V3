@@ -12,8 +12,9 @@ import { IsometricGrid } from '@/components/IsometricGrid';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
-import { CATALOG, GRID_SIZE, getCatalogItem } from '@/lib/garden-domain';
+import { CATALOG, GRID_SIZE, REMOVE_TOOL_ID, getCatalogItem, getPlacementBlock } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { useStatusMessage } from '@/lib/useStatusMessage';
 import { components } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -40,23 +41,28 @@ const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
     bench: 'benchDetailed',
 };
 
-// Every catalog entry has iso art, so the isometric picker shows the whole catalog.
-const PICKER_ITEMS: PickerEntry[] = CATALOG.map((item) => ({
-    id: item.id,
-    label: item.label,
-    cost: item.cost,
-    icon: (
-        <AtlasSprite
-            atlas={isoDecorationAtlas}
-            sprite={ITEM_SPRITE[item.id]}
-            size={PICKER_ICON_SIZE}
-        />
-    ),
-}));
+// Every catalog entry has iso art, so the isometric picker shows the whole catalog,
+// plus a "Remove" tool at the front for clearing a tile back to empty.
+const PICKER_ITEMS: PickerEntry[] = [
+    { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
+    ...CATALOG.map((item) => ({
+        id: item.id,
+        label: item.label,
+        cost: item.cost,
+        icon: (
+            <AtlasSprite
+                atlas={isoDecorationAtlas}
+                sprite={ITEM_SPRITE[item.id]}
+                size={PICKER_ICON_SIZE}
+            />
+        ),
+    })),
+];
 
 const Garden = () => {
-    const { state, placeItem } = useGardenDomain();
+    const { state, placeItem, removeItem } = useGardenDomain();
     const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
+    const { message, showMessage } = useStatusMessage();
 
     const insets = useSafeAreaInsets();
 
@@ -71,6 +77,8 @@ const Garden = () => {
                 <Link href="/quest-page" className="text-mutedForeground underline">
                     Earn more points from Quests →
                 </Link>
+
+                {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
             <ItemPicker
@@ -91,8 +99,19 @@ const Garden = () => {
                     tileWidth={TILE_WIDTH}
                     tileHeightStep={TILE_HEIGHT_STEP}
                     onTilePress={(index) => {
+                        if (selectedItemId === REMOVE_TOOL_ID) {
+                            if (state.tiles[index] === null) showMessage('Nothing to remove here');
+                            else removeItem(index);
+                            return;
+                        }
+
                         const item = getCatalogItem(selectedItemId);
-                        if (item) placeItem(index, item);
+                        if (!item) return;
+
+                        const block = getPlacementBlock(state, index, item);
+                        if (block === 'occupied') showMessage('Tile already has something — remove it first');
+                        else if (block === 'insufficient-points') showMessage('Not enough points');
+                        else placeItem(index, item);
                     }}
                     renderGround={() => (
                         <AtlasSprite

@@ -8,6 +8,7 @@ import {
     GardenDomainState,
     GRID_SIZE,
     placeItem as placeItemInState,
+    removeItem as removeItemInState,
 } from '@/lib/garden-domain';
 
 const STORAGE_KEY = 'gryph-gardens:garden-state';
@@ -25,6 +26,7 @@ function isValidGardenState(value: unknown): value is GardenDomainState {
 type Store = {
     state: GardenDomainState;
     placeItem: (index: number, item: CatalogItem) => void;
+    removeItem: (index: number) => void;
     addPoints: (amount: number) => void;
     resetGarden: () => void;
 };
@@ -62,6 +64,10 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         setState((prev) => placeItemInState(prev, index, item));
     };
 
+    const removeItem = (index: number) => {
+        setState((prev) => removeItemInState(prev, index));
+    };
+
     const addPoints = (amount: number) => {
         setState((prev) => addPointsToState(prev, amount));
     };
@@ -71,7 +77,7 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
     };
 
     return (
-        <GardenDomainContext.Provider value={{ state, placeItem, addPoints, resetGarden }}>
+        <GardenDomainContext.Provider value={{ state, placeItem, removeItem, addPoints, resetGarden }}>
             {children}
         </GardenDomainContext.Provider>
     );

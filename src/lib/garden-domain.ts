@@ -39,6 +39,29 @@ export function addPoints(state: GardenDomainState, amount: number): GardenDomai
   return { ...state, points: state.points + amount };
 }
 
+/** Clears a tile back to empty. No point refund — placing is a deliberate sink. */
+export function removeItem(state: GardenDomainState, index: number): GardenDomainState {
+  if (index < 0 || index >= state.tiles.length) return state;
+  if (state.tiles[index] === null) return state;
+  const tiles = [...state.tiles];
+  tiles[index] = null;
+  return { ...state, tiles };
+}
+
+export type PlacementBlock = 'occupied' | 'insufficient-points' | null;
+
+/** Why a placement would fail, for UI feedback — canPlace() collapses this to a bool. */
+export function getPlacementBlock(
+  state: GardenDomainState,
+  index: number,
+  item: CatalogItem
+): PlacementBlock {
+  if (index < 0 || index >= state.tiles.length) return 'occupied';
+  if (state.tiles[index] !== null) return 'occupied';
+  if (state.points < item.cost) return 'insufficient-points';
+  return null;
+}
+
 /**
  * The shared catalog of placeable items — same ids, labels and costs for both
  * garden screens, so picking "Tree" costs the same and behaves the same no
@@ -61,3 +84,6 @@ export const CATALOG: CatalogItem[] = [
 export function getCatalogItem(id: string): CatalogItem | undefined {
   return CATALOG.find((item) => item.id === id);
 }
+
+/** Sentinel picker selection id for the "clear this tile" tool — not a real catalog item. */
+export const REMOVE_TOOL_ID = '__remove__';

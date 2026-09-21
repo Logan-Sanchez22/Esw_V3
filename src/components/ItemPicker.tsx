@@ -57,7 +57,9 @@ export function ItemPicker({ items, selectedId, onSelect, points }: Props) {
                         <Text numberOfLines={1} style={{ fontSize: 10, color: 'white' }}>
                             {item.label}
                         </Text>
-                        <Text style={{ fontSize: 10, color: '#facc15' }}>{item.cost} pts</Text>
+                        <Text style={{ fontSize: 10, color: '#facc15' }}>
+                            {item.cost > 0 ? `${item.cost} pts` : 'Free'}
+                        </Text>
                     </TouchableOpacity>
                 );
             })}

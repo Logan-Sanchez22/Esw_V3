@@ -10,8 +10,9 @@ import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
 import { topDownProps32Atlas } from '@/lib/atlases/topdown-props-atlas';
 import { topDownSmall16Atlas } from '@/lib/atlases/topdown-small-atlas';
-import { CATALOG, GRID_SIZE, getCatalogItem } from '@/lib/garden-domain';
+import { CATALOG, GRID_SIZE, REMOVE_TOOL_ID, getCatalogItem, getPlacementBlock } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { useStatusMessage } from '@/lib/useStatusMessage';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -34,25 +35,30 @@ const ITEM_SPRITE = {
     log: { atlas: topDownProps32Atlas, key: 'logPileAngled' as const },
 };
 
-const PICKER_ITEMS: PickerEntry[] = CATALOG.filter((item) => item.id in ITEM_SPRITE).map((item) => {
-    const deco = ITEM_SPRITE[item.id as keyof typeof ITEM_SPRITE];
-    return {
-        id: item.id,
-        label: item.label,
-        cost: item.cost,
-        icon: <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={PICKER_ICON_SIZE} />,
-    };
-});
+const PICKER_ITEMS: PickerEntry[] = [
+    { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
+    ...CATALOG.filter((item) => item.id in ITEM_SPRITE).map((item) => {
+        const deco = ITEM_SPRITE[item.id as keyof typeof ITEM_SPRITE];
+        return {
+            id: item.id,
+            label: item.label,
+            cost: item.cost,
+            icon: <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={PICKER_ICON_SIZE} />,
+        };
+    }),
+];
 
 const GardenAlt = () => {
-    const { state, placeItem } = useGardenDomain();
-    const [selectedItemId, setSelectedItemId] = useState<string>(PICKER_ITEMS[0].id);
+    const { state, placeItem, removeItem } = useGardenDomain();
+    const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
+    const { message, showMessage } = useStatusMessage();
 
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
                 <Text className="text-xl font-bold text-success mb-2">TopDown Garden</Text>
                 <Text className="text-mutedForeground">{state.points} pts</Text>
+                {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
             <ItemPicker
@@ -73,8 +79,19 @@ const GardenAlt = () => {
                         <TouchableOpacity
                             style={{ width: TILE_SIZE, height: TILE_SIZE }}
                             onPress={() => {
+                                if (selectedItemId === REMOVE_TOOL_ID) {
+                                    if (state.tiles[i] === null) showMessage('Nothing to remove here');
+                                    else removeItem(i);
+                                    return;
+                                }
+
                                 const item = getCatalogItem(selectedItemId);
-                                if (item) placeItem(i, item);
+                                if (!item) return;
+
+                                const block = getPlacementBlock(state, i, item);
+                                if (block === 'occupied') showMessage('Tile already has something — remove it first');
+                                else if (block === 'insufficient-points') showMessage('Not enough points');
+                                else placeItem(i, item);
                             }}
                         >
                             <AtlasSprite atlas={topDownGroundAtlas} sprite="grass" size={TILE_SIZE} fit="stretch" />
