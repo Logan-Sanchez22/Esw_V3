@@ -1,4 +1,5 @@
-import {Tabs} from "expo-router"
+import {Redirect, Tabs} from "expo-router"
+import {useAuth} from "@clerk/expo";
 import {tabs} from "../../../constants/data";
 import {View} from "react-native";
 import clsx from "clsx";
@@ -10,6 +11,14 @@ const tabBar = components.tabBar;
 
 const TabLayout = () => {
     const insets = useSafeAreaInsets();
+    const { isLoaded, isSignedIn } = useAuth();
+
+    // Wait for Clerk to finish reading the token cache before deciding —
+    // deciding early would flash a redirect to sign-in even for an
+    // already-signed-in user on cold start.
+    if (!isLoaded) return null;
+    if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
+
     const TabIcon = ({focused, icon}: TabIconProps) => {
         return (
             <View className={"tabs-icon"}>

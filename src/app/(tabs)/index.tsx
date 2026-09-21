@@ -13,9 +13,6 @@ export default function App() {
         </Text>
         <Link href="/onboarding" className="mt-4 font-sans-bold rounded bg-primary
         text-white p-4">Go to onboarding</Link>
-
-        <Link href="/(auth)/sign-in" className="mt-4 font-sans-bold rounded bg-primary
-        text-white p-4">Sign into account</Link>
       </SafeAreaView>
   );
 }

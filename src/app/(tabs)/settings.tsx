@@ -2,6 +2,7 @@ import { Alert, Text, TouchableOpacity, View } from 'react-native'
 import React from 'react'
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+import { useAuth, useUser } from "@clerk/expo";
 
 import { QUESTS } from '@/lib/quest-domain';
 import { useQuestDomain } from '@/context/quest-domain-store';
@@ -29,6 +30,8 @@ const DangerButton = ({ label, onPress }: { label: string; onPress: () => void }
 const Settings = () => {
     const { state: gardenState, resetGarden } = useGardenDomain();
     const { state: questState, resetQuests } = useQuestDomain();
+    const { signOut } = useAuth();
+    const { user } = useUser();
 
     const confirmReset = (title: string, message: string, onConfirm: () => void) => {
         Alert.alert(title, message, [
@@ -39,7 +42,12 @@ const Settings = () => {
 
     return (
         <SafeAreaView className="flex-1 bg-background p-5">
-            <Text className="text-xl font-bold text-success mb-6">Settings</Text>
+            <Text className="text-xl font-bold text-success mb-2">Settings</Text>
+            {user?.primaryEmailAddress && (
+                <Text className="text-mutedForeground mb-6">
+                    Signed in as {user.primaryEmailAddress.emailAddress}
+                </Text>
+            )}
 
             <Text className="text-mutedForeground mb-1">
                 {gardenState.points} pts · {questState.completedQuestIds.length}/{QUESTS.length} quests completed
@@ -70,6 +78,26 @@ const Settings = () => {
                     }
                 />
             </View>
+
+            <TouchableOpacity
+                onPress={() =>
+                    Alert.alert('Sign out?', undefined, [
+                        { text: 'Cancel', style: 'cancel' },
+                        { text: 'Sign Out', style: 'destructive', onPress: () => signOut() },
+                    ])
+                }
+                style={{
+                    borderRadius: 10,
+                    borderWidth: 1,
+                    borderColor: 'rgba(255,255,255,0.15)',
+                    backgroundColor: 'rgba(255,255,255,0.05)',
+                    paddingVertical: 12,
+                    paddingHorizontal: 16,
+                    marginTop: 12,
+                }}
+            >
+                <Text style={{ color: '#ECFDF5', fontWeight: '600' }}>Sign Out</Text>
+            </TouchableOpacity>
         </SafeAreaView>
     )
 }
