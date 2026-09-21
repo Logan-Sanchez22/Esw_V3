@@ -1,9 +1,11 @@
 import { useState } from 'react'
-import { Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { Text, TextInput, TouchableOpacity } from 'react-native'
 import { Link, router } from "expo-router";
 import { useSignIn } from "@clerk/expo";
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
+
+import { KeyboardAwareForm } from '@/components/KeyboardAwareForm';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -46,65 +48,67 @@ const SignIn = () => {
     };
 
     return (
-        <SafeAreaView className="flex-1 bg-background p-5 justify-center">
-            <Text className="text-2xl font-bold text-success mb-6">Sign In</Text>
+        <SafeAreaView className="flex-1 bg-background">
+            <KeyboardAwareForm>
+                <Text className="text-2xl font-bold text-success mb-6">Sign In</Text>
 
-            <TextInput
-                autoCapitalize="none"
-                keyboardType="email-address"
-                placeholder="Email"
-                placeholderTextColor="#6EE7B7"
-                value={identifier}
-                onChangeText={setIdentifier}
-                style={{
-                    borderWidth: 1,
-                    borderColor: '#065F46',
-                    borderRadius: 8,
-                    padding: 12,
-                    color: '#ECFDF5',
-                    marginBottom: 12,
-                }}
-            />
+                <TextInput
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                    placeholder="Email"
+                    placeholderTextColor="#6EE7B7"
+                    value={identifier}
+                    onChangeText={setIdentifier}
+                    style={{
+                        borderWidth: 1,
+                        borderColor: '#065F46',
+                        borderRadius: 8,
+                        padding: 12,
+                        color: '#ECFDF5',
+                        marginBottom: 12,
+                    }}
+                />
 
-            <TextInput
-                autoCapitalize="none"
-                secureTextEntry
-                placeholder="Password"
-                placeholderTextColor="#6EE7B7"
-                value={password}
-                onChangeText={setPassword}
-                style={{
-                    borderWidth: 1,
-                    borderColor: '#065F46',
-                    borderRadius: 8,
-                    padding: 12,
-                    color: '#ECFDF5',
-                    marginBottom: 12,
-                }}
-            />
+                <TextInput
+                    autoCapitalize="none"
+                    secureTextEntry
+                    placeholder="Password"
+                    placeholderTextColor="#6EE7B7"
+                    value={password}
+                    onChangeText={setPassword}
+                    style={{
+                        borderWidth: 1,
+                        borderColor: '#065F46',
+                        borderRadius: 8,
+                        padding: 12,
+                        color: '#ECFDF5',
+                        marginBottom: 12,
+                    }}
+                />
 
-            {error && <Text className="text-warning mb-3">{error}</Text>}
+                {error && <Text className="text-warning mb-3">{error}</Text>}
 
-            <TouchableOpacity
-                disabled={submitting || !identifier || !password}
-                onPress={onSubmit}
-                style={{
-                    backgroundColor: '#34D399',
-                    borderRadius: 8,
-                    padding: 14,
-                    alignItems: 'center',
-                    opacity: submitting || !identifier || !password ? 0.5 : 1,
-                    marginBottom: 16,
-                }}
-            >
-                <Text style={{ color: '#020F09', fontWeight: '700' }}>
-                    {submitting ? 'Signing in…' : 'Sign In'}
-                </Text>
-            </TouchableOpacity>
+                <TouchableOpacity
+                    disabled={submitting || !identifier || !password}
+                    onPress={onSubmit}
+                    style={{
+                        backgroundColor: '#34D399',
+                        borderRadius: 8,
+                        padding: 14,
+                        alignItems: 'center',
+                        opacity: submitting || !identifier || !password ? 0.5 : 1,
+                        marginBottom: 16,
+                    }}
+                >
+                    <Text style={{ color: '#020F09', fontWeight: '700' }}>
+                        {submitting ? 'Signing in…' : 'Sign In'}
+                    </Text>
+                </TouchableOpacity>
 
-            <Link href={"/(auth)/sign-up"} className="text-mutedForeground underline text-center">
-                Create account
-            </Link>
+                <Link href={"/(auth)/sign-up"} className="text-mutedForeground underline text-center">
+                    Create account
+                </Link>
+            </KeyboardAwareForm>
         </SafeAreaView>
     )
 }
