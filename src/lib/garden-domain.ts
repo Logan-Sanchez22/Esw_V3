@@ -110,6 +110,12 @@ export const CATALOG: CatalogItem[] = [
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5 },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5 },
   { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7 },
+  // Top-down only for now — no honest iso counterpart in the 41 sprites
+  // extracted from misc.png so far (lily pads/grass tufts aren't part of
+  // that sheet's subject matter). Same asymmetry the iso side already has
+  // in the other direction (bench, most flower colors).
+  { id: 'lilyPad', label: 'Lily Pad', cost: 2, visualScale: 0.4 },
+  { id: 'grassTuft', label: 'Grass Tuft', cost: 1, visualScale: 0.3 },
 ];
 
 export function getCatalogItem(id: string): CatalogItem | undefined {

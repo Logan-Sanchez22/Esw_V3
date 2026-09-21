@@ -65,11 +65,12 @@ const GROUND_SPRITE: Record<string, keyof typeof isoBlocksAtlas.sprites> = {
     stonePath: 'stonePathPlain1',
 };
 
-// Every catalog entry has iso art, so the isometric picker shows the whole catalog,
-// plus a "Remove" tool at the front for clearing a tile back to empty.
+// Not every catalog entry has iso art (lilyPad/grassTuft are top-down only) —
+// filter to what ITEM_SPRITE actually covers, same pattern garden-alt.tsx
+// already uses. Plus a "Remove" tool at the front for clearing a tile.
 const PICKER_ITEMS: PickerEntry[] = [
     { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-    ...CATALOG.map((item) => ({
+    ...CATALOG.filter((item) => item.id in ITEM_SPRITE).map((item) => ({
         id: item.id,
         label: item.label,
         cost: item.cost,

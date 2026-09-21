@@ -10,7 +10,7 @@ import { PannableGrid } from '@/components/PannableGrid';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
 import { topDownProps32Atlas } from '@/lib/atlases/topdown-props-atlas';
-import { topDownSmall16Atlas } from '@/lib/atlases/topdown-small-atlas';
+import { topDownSmall16Atlas, topDownTuft16x32Atlas } from '@/lib/atlases/topdown-small-atlas';
 import {
     CATALOG,
     GRID_SIZE,
@@ -48,6 +48,9 @@ const ITEM_SPRITE = {
     mushroom: { atlas: topDownSmall16Atlas, key: 'mushroomCluster' as const },
     rock: { atlas: topDownProps32Atlas, key: 'rockGray' as const },
     log: { atlas: topDownProps32Atlas, key: 'logPileAngled' as const },
+    // Top-down only — see the comment on these two in CATALOG.
+    lilyPad: { atlas: topDownProps32Atlas, key: 'lilyPadFlower' as const },
+    grassTuft: { atlas: topDownTuft16x32Atlas, key: 'grassTuftTall' as const },
 };
 
 // Top-down ground atlas only has grass/dirt/water — no stone-path equivalent,
