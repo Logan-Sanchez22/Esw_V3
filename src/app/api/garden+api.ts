@@ -6,7 +6,13 @@ import { gardens } from '@/db/schema';
 import { GRID_SIZE } from '@/lib/garden-domain';
 import type { GardenDomainState, TileState } from '@/lib/garden-domain';
 
-const clerkClient = createClerkClient({ secretKey: process.env.CLERK_SECRET_KEY });
+// authenticateRequest also needs the publishable key; @clerk/backend only
+// looks for a bare CLERK_PUBLISHABLE_KEY env var by default, which we don't
+// set (ours is EXPO_PUBLIC_-prefixed for client bundling), so pass it explicitly.
+const clerkClient = createClerkClient({
+  secretKey: process.env.CLERK_SECRET_KEY,
+  publishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
+});
 
 async function requireUserId(request: Request): Promise<string | Response> {
   const requestState = await clerkClient.authenticateRequest(request);
