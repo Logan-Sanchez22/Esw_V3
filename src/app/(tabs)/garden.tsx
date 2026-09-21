@@ -10,9 +10,17 @@ import {
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { IsometricGrid } from '@/components/IsometricGrid';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
+import { ModeToggle } from '@/components/ModeToggle';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
-import { CATALOG, GRID_SIZE, REMOVE_TOOL_ID, getCatalogItem, getPlacementBlock } from '@/lib/garden-domain';
+import {
+    CATALOG,
+    GRID_SIZE,
+    GROUND_CATALOG,
+    REMOVE_TOOL_ID,
+    getCatalogItem,
+    getPlacementBlock,
+} from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
 import { components } from '../../../constants/theme';
@@ -29,6 +37,13 @@ const TILE_HEIGHT_STEP = 28;
 
 const PICKER_ICON_SIZE = 32;
 
+type Mode = 'decorate' | 'paint';
+
+const MODE_OPTIONS = [
+    { id: 'decorate' as const, label: '🌳 Decorate' },
+    { id: 'paint' as const, label: '🎨 Ground' },
+];
+
 const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
     tree: 'treeFullGrown',
     treeBare: 'treeBare',
@@ -39,6 +54,15 @@ const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
     rock: 'rockBoulder',
     log: 'logPair',
     bench: 'benchDetailed',
+};
+
+// All 47 iso ground tiles exist in the atlas — these four are the curated
+// selection exposed as paintable ground types (see GROUND_CATALOG).
+const GROUND_SPRITE: Record<string, keyof typeof isoBlocksAtlas.sprites> = {
+    grass: 'grassFlat',
+    dirt: 'soilPlain1',
+    water: 'waterPlain',
+    stonePath: 'stonePathPlain1',
 };
 
 // Every catalog entry has iso art, so the isometric picker shows the whole catalog,
@@ -59,9 +83,24 @@ const PICKER_ITEMS: PickerEntry[] = [
     })),
 ];
 
+const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
+    id: ground.id,
+    label: ground.label,
+    cost: 0,
+    icon: (
+        <AtlasSprite
+            atlas={isoBlocksAtlas}
+            sprite={GROUND_SPRITE[ground.id]}
+            size={PICKER_ICON_SIZE}
+        />
+    ),
+}));
+
 const Garden = () => {
-    const { state, placeItem, removeItem } = useGardenDomain();
+    const { state, placeItem, removeItem, paintGround } = useGardenDomain();
+    const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
+    const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_CATALOG[0].id);
     const { message, showMessage } = useStatusMessage();
 
     const insets = useSafeAreaInsets();
@@ -81,12 +120,23 @@ const Garden = () => {
                 {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
-            <ItemPicker
-                items={PICKER_ITEMS}
-                selectedId={selectedItemId}
-                onSelect={setSelectedItemId}
-                points={state.points}
-            />
+            <ModeToggle options={MODE_OPTIONS} selected={mode} onSelect={setMode} />
+
+            {mode === 'decorate' ? (
+                <ItemPicker
+                    items={PICKER_ITEMS}
+                    selectedId={selectedItemId}
+                    onSelect={setSelectedItemId}
+                    points={state.points}
+                />
+            ) : (
+                <ItemPicker
+                    items={GROUND_PICKER_ITEMS}
+                    selectedId={selectedGroundId}
+                    onSelect={setSelectedGroundId}
+                    points={state.points}
+                />
+            )}
 
             <View
                 style={{
@@ -99,8 +149,13 @@ const Garden = () => {
                     tileWidth={TILE_WIDTH}
                     tileHeightStep={TILE_HEIGHT_STEP}
                     onTilePress={(index) => {
+                        if (mode === 'paint') {
+                            paintGround(index, selectedGroundId);
+                            return;
+                        }
+
                         if (selectedItemId === REMOVE_TOOL_ID) {
-                            if (state.tiles[index] === null) showMessage('Nothing to remove here');
+                            if (state.tiles[index].item === null) showMessage('Nothing to remove here');
                             else removeItem(index);
                             return;
                         }
@@ -113,25 +168,26 @@ const Garden = () => {
                         else if (block === 'insufficient-points') showMessage('Not enough points');
                         else placeItem(index, item);
                     }}
-                    renderGround={() => (
+                    renderGround={(index) => (
                         <AtlasSprite
                             atlas={isoBlocksAtlas}
-                            sprite="grassFlat"
+                            sprite={GROUND_SPRITE[state.tiles[index].ground] ?? 'grassFlat'}
                             size={TILE_WIDTH}
                         />
                     )}
                     renderDecoration={(index) => {
-                        const placed = state.tiles[index];
-                        if (!placed || !ITEM_SPRITE[placed]) return null;
+                        const tile = state.tiles[index];
+                        if (!tile.item || !ITEM_SPRITE[tile.item]) return null;
 
                         return (
                             <View>
                                 {/* Invisible — exists only so this decoration's height/anchor
-                                 math matches a real ground tile's, without duplicating the
-                                 sprite sizing logic. Drawing is handled by the ground pass. */}
+                                 math matches this tile's own ground sprite's, without
+                                 duplicating the sprite sizing logic. Drawing is handled by
+                                 the ground pass. */}
                                 <AtlasSprite
                                     atlas={isoBlocksAtlas}
-                                    sprite="grassFlat"
+                                    sprite={GROUND_SPRITE[tile.ground] ?? 'grassFlat'}
                                     size={TILE_WIDTH}
                                     style={{ opacity: 0 }}
                                 />
@@ -145,7 +201,7 @@ const Garden = () => {
                                 >
                                     <AtlasSprite
                                         atlas={isoDecorationAtlas}
-                                        sprite={ITEM_SPRITE[placed]}
+                                        sprite={ITEM_SPRITE[tile.item]}
                                         size={TILE_WIDTH}
                                     />
                                 </View>
