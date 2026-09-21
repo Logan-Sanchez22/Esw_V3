@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
 import { styled } from "nativewind";
 import {
     SafeAreaView as RNSafeAreaView,
@@ -8,9 +8,10 @@ import {
 
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { IsometricGrid } from '@/components/IsometricGrid';
+import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
-import { GRID_SIZE } from '@/lib/garden-domain';
+import { CATALOG, GRID_SIZE, getCatalogItem } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { components } from '../../../constants/theme';
 
@@ -24,15 +25,37 @@ const SafeAreaView = styled(RNSafeAreaView);
 const TILE_WIDTH = 60;
 const TILE_HEIGHT_STEP = 28;
 
+const PICKER_ICON_SIZE = 32;
 
 const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
     tree: 'treeFullGrown',
+    treeBare: 'treeBare',
     bush: 'bushRound1',
+    bushAlt: 'bushRound2',
+    flower: 'flowerBunchRed',
     mushroom: 'mushroomRed',
+    rock: 'rockBoulder',
+    log: 'logPair',
+    bench: 'benchDetailed',
 };
+
+// Every catalog entry has iso art, so the isometric picker shows the whole catalog.
+const PICKER_ITEMS: PickerEntry[] = CATALOG.map((item) => ({
+    id: item.id,
+    label: item.label,
+    cost: item.cost,
+    icon: (
+        <AtlasSprite
+            atlas={isoDecorationAtlas}
+            sprite={ITEM_SPRITE[item.id]}
+            size={PICKER_ICON_SIZE}
+        />
+    ),
+}));
 
 const Garden = () => {
     const { state, placeItem, addPoints } = useGardenDomain();
+    const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
 
     const insets = useSafeAreaInsets();
 
@@ -53,6 +76,13 @@ const Garden = () => {
                 </TouchableOpacity>
             </View>
 
+            <ItemPicker
+                items={PICKER_ITEMS}
+                selectedId={selectedItemId}
+                onSelect={setSelectedItemId}
+                points={state.points}
+            />
+
             <View
                 style={{
                     flex: 1,
@@ -63,13 +93,10 @@ const Garden = () => {
                     gridSize={GRID_SIZE}
                     tileWidth={TILE_WIDTH}
                     tileHeightStep={TILE_HEIGHT_STEP}
-                    onTilePress={(index) =>
-                        placeItem(index, {
-                            id: 'tree',
-                            label: 'Tree',
-                            cost: 10,
-                        })
-                    }
+                    onTilePress={(index) => {
+                        const item = getCatalogItem(selectedItemId);
+                        if (item) placeItem(index, item);
+                    }}
                     renderGround={() => (
                         <AtlasSprite
                             atlas={isoBlocksAtlas}

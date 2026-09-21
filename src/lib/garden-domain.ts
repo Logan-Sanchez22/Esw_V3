@@ -38,3 +38,26 @@ export function placeItem(
 export function addPoints(state: GardenDomainState, amount: number): GardenDomainState {
   return { ...state, points: state.points + amount };
 }
+
+/**
+ * The shared catalog of placeable items — same ids, labels and costs for both
+ * garden screens, so picking "Tree" costs the same and behaves the same no
+ * matter which view you're in. Each screen maps these ids to its own sprite
+ * (see ITEM_SPRITE in garden.tsx / garden-alt.tsx) — not every id necessarily
+ * has art in every atlas yet, so a screen may only show a subset of this list.
+ */
+export const CATALOG: CatalogItem[] = [
+  { id: 'tree', label: 'Tree', cost: 12 },
+  { id: 'treeBare', label: 'Bare Tree', cost: 8 },
+  { id: 'bush', label: 'Bush', cost: 5 },
+  { id: 'bushAlt', label: 'Bush', cost: 5 },
+  { id: 'flower', label: 'Flowers', cost: 2 },
+  { id: 'mushroom', label: 'Mushroom', cost: 3 },
+  { id: 'rock', label: 'Rock', cost: 4 },
+  { id: 'log', label: 'Log', cost: 3 },
+  { id: 'bench', label: 'Bench', cost: 15 },
+];
+
+export function getCatalogItem(id: string): CatalogItem | undefined {
+  return CATALOG.find((item) => item.id === id);
+}
