@@ -237,6 +237,13 @@ export function IsometricGrid({
 
     const groundTiles = [];
     const decorationTiles = [];
+    // One shared canvas for every tile's outline, rather than one <Svg> per
+    // tile — 225 independently-rasterized elements each rounded to their own
+    // sub-pixel position produced hairline seams at shared vertices between
+    // adjacent tiles, even though the underlying x/y math lines up exactly.
+    // A single Svg means adjacent tiles' edges are drawn in one coordinate
+    // space, so a shared vertex is one point, not two independently-rounded ones.
+    const outlinePolygons: ReactNode[] = [];
 
     const positions: { row: number; col: number }[] = [];
 
@@ -281,28 +288,17 @@ export function IsometricGrid({
 
         if (tileOutlineColor || index === highlightIndex) {
             const isHighlight = index === highlightIndex;
+            const cx = x + tileWidth / 2;
+            const cy = y + tileHeightStep / 2;
 
-            groundTiles.push(
-                <View
+            outlinePolygons.push(
+                <Polygon
                     key={`outline-${index}`}
-                    pointerEvents="none"
-                    style={{
-                        position: 'absolute',
-                        left: x,
-                        top: y,
-                        width: tileWidth,
-                        height: tileHeightStep,
-                    }}
-                >
-                    <Svg width={tileWidth} height={tileHeightStep}>
-                        <Polygon
-                            points={`${tileWidth / 2},0 ${tileWidth},${tileHeightStep / 2} ${tileWidth / 2},${tileHeightStep} 0,${tileHeightStep / 2}`}
-                            fill="none"
-                            stroke={isHighlight ? highlightColor : tileOutlineColor}
-                            strokeWidth={isHighlight ? 2 : 1}
-                        />
-                    </Svg>
-                </View>
+                    points={`${cx},${y} ${x + tileWidth},${cy} ${cx},${y + tileHeightStep} ${x},${cy}`}
+                    fill="none"
+                    stroke={isHighlight ? highlightColor : tileOutlineColor}
+                    strokeWidth={isHighlight ? 2 : 1}
+                />
             );
         }
 
@@ -361,6 +357,16 @@ export function IsometricGrid({
                     ]}
                 >
                     {groundTiles}
+                    {outlinePolygons.length > 0 && (
+                        <Svg
+                            width={fullDiamondWidth}
+                            height={fullDiamondHeight}
+                            style={{ position: 'absolute', left: 0, top: 0 }}
+                            pointerEvents="none"
+                        >
+                            {outlinePolygons}
+                        </Svg>
+                    )}
                     {/* pointerEvents="none" so taps fall through to the ground tile beneath —
                      * decorations are purely visual here, tap-to-place is handled by the
                      * ground layer's onTouchEnd above. */}
