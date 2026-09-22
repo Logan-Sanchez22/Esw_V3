@@ -67,8 +67,4 @@
     .tabs-active {
         @apply bg-secondary;
     }
-
-    .tabs-glyph {
-        @apply size-6;
-    }
 }

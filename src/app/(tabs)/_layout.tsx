@@ -2,9 +2,8 @@ import {Redirect, Tabs} from "expo-router"
 import {useAuth} from "@clerk/expo";
 import {tabs} from "../../../constants/data";
 import {useEffect, useState} from "react";
-import {View} from "react-native";
+import {Text, View} from "react-native";
 import clsx from "clsx";
-import {Image} from "react-native"
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {colors, components} from "../../../constants/theme";
 import {hasSeenOnboarding} from "@/lib/onboarding-storage";
@@ -33,7 +32,7 @@ const TabLayout = () => {
         return (
             <View className={"tabs-icon"}>
                 <View className={clsx('tabs-pill', focused && 'tabs-active')}>
-                    <Image source={icon} resizeMode={"contain"} className={"tabs-glyph"}/>
+                    <Text style={{ fontSize: 24, lineHeight: 28 }}>{icon}</Text>
                 </View>
             </View>
         );
