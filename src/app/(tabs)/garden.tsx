@@ -45,6 +45,7 @@ import {
     resolvePlacement,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { useGardenTheme } from '@/context/garden-theme-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
 import { colors, components, gridOutlineOpacity } from '../../../constants/theme';
 
@@ -167,6 +168,7 @@ const ALL_GROUND_PICKER_ITEMS: PickerEntry[] = [...GROUND_PICKER_ITEMS, ...GROUN
 
 const Garden = () => {
     const { state, placeItem, removeItem, moveItem, paintGround, paintFormation, lastAction, undoLastAction } = useGardenDomain();
+    const { scheme } = useGardenTheme();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     // Holds either a plain GROUND_CATALOG id (painted immediately on tap) or
@@ -446,7 +448,7 @@ const Garden = () => {
     };
 
     return (
-        <SafeAreaView className={"flex-1 bg-background"}>
+        <SafeAreaView className={scheme === 'night' ? "flex-1 bg-background" : "flex-1 bg-sky"}>
             <View className="p-5">
                 <ScreenHeader title="Isometric Garden" />
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, marginTop: -8 }}>
@@ -516,15 +518,15 @@ const Garden = () => {
                 style={{
                     flex: 1,
                     paddingBottom: bottomNavSpace,
-                    // A subtle panel behind the garden viewport (same token
-                    // as every Card elsewhere in the app) — the garden used
-                    // to sit directly on a bright sky-blue page background
-                    // that clashed with the rest of the app's dark theme;
-                    // this gives it a distinct "hero panel" instead of just
-                    // floating on the page. Doesn't affect IsometricGrid's
-                    // own sizing — it measures its actual container via
-                    // onLayout, not a hardcoded assumption.
-                    backgroundColor: colors.card,
+                    // 'night' gets a subtle panel behind the viewport (same
+                    // token as every Card elsewhere in the app), matching
+                    // the rest of the app's dark theme. 'day' leaves this
+                    // undefined so the SafeAreaView's own bg-sky shows
+                    // through unbroken — the original look. Doesn't affect
+                    // IsometricGrid's own sizing either way — it measures
+                    // its actual container via onLayout, not a hardcoded
+                    // assumption.
+                    backgroundColor: scheme === 'night' ? colors.card : undefined,
                 }}
             >
                 <IsometricGrid

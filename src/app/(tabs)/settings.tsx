@@ -11,6 +11,7 @@ import { completedTodayCount, QUESTS } from '@/lib/quest-domain';
 import { getVolume, isMusicEnabled, isSoundEnabled, setMusicEnabled, setSoundEnabled, setVolume } from '@/lib/sound';
 import { useQuestDomain } from '@/context/quest-domain-store';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { useGardenTheme } from '@/context/garden-theme-store';
 import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -18,6 +19,11 @@ const SafeAreaView = styled(RNSafeAreaView);
 const ON_OFF_OPTIONS = [
     { id: 'on' as const, label: 'On' },
     { id: 'off' as const, label: 'Off' },
+];
+
+const DAY_NIGHT_OPTIONS = [
+    { id: 'day' as const, label: '☀️ Day' },
+    { id: 'night' as const, label: '🌙 Night' },
 ];
 
 function PreferenceLabel({ children }: { children: React.ReactNode }) {
@@ -38,6 +44,7 @@ function PreferenceLabel({ children }: { children: React.ReactNode }) {
 const Settings = () => {
     const { state: gardenState, resetGarden } = useGardenDomain();
     const { state: questState, resetQuests } = useQuestDomain();
+    const { scheme, setScheme } = useGardenTheme();
     const { signOut } = useAuth();
     const { user } = useUser();
     // Mirrors sound.ts's module-level flags/value in local state purely so
@@ -158,6 +165,20 @@ const Settings = () => {
                         setVolume(v);
                     }}
                 />
+
+                <PreferenceLabel>Garden Background</PreferenceLabel>
+                <ModeToggle options={DAY_NIGHT_OPTIONS} selected={scheme} onSelect={setScheme} />
+                <Text
+                    style={{
+                        color: colors.mutedForeground,
+                        fontSize: typography.caption.fontSize,
+                        fontFamily: typography.caption.fontFamily,
+                        marginTop: -spacing[1],
+                        marginBottom: spacing[4],
+                    }}
+                >
+                    Applies to both garden screens.
+                </Text>
 
                 <SectionHeading title="Danger Zone" />
                 <View style={{ gap: spacing[3] }}>

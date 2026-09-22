@@ -44,6 +44,7 @@ import {
     resolvePlacement,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
+import { useGardenTheme } from '@/context/garden-theme-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
 import { colors, gridOutlineOpacity, mixColors } from '../../../constants/theme';
 
@@ -146,6 +147,7 @@ const ALL_GROUND_PICKER_ITEMS: PickerEntry[] = [...GROUND_PICKER_ITEMS, ...GROUN
 
 const GardenAlt = () => {
     const { state, placeItem, removeItem, moveItem, paintGround, paintFormation, lastAction, undoLastAction } = useGardenDomain();
+    const { scheme } = useGardenTheme();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     // Holds either a plain GROUND_CATALOG id (painted immediately on tap) or
@@ -423,7 +425,7 @@ const GardenAlt = () => {
     };
 
     return (
-        <SafeAreaView className={"flex-1 bg-background"}>
+        <SafeAreaView className={scheme === 'night' ? "flex-1 bg-background" : "flex-1 bg-sky"}>
             <View className="p-5">
                 <ScreenHeader title="Top-Down Garden" />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: -8 }}>
@@ -484,13 +486,12 @@ const GardenAlt = () => {
                 </View>
             )}
 
-            {/* Same panel treatment as the isometric screen (colors.card
-             behind the grid) — purely a background color, no size/margin
+            {/* Same panel treatment as the isometric screen: 'night' gets a
+             colors.card backdrop, 'day' leaves it undefined so bg-sky shows
+             through unbroken. Purely a background color, no size/margin
              change, so PannableGrid's window-based viewport math above is
-             unaffected. The garden used to sit directly on a bright
-             sky-blue page background; this gives both screens a shared
-             "hero panel" instead. */}
-            <View style={{ flex: 1, backgroundColor: colors.card }}>
+             unaffected either way. */}
+            <View style={{ flex: 1, backgroundColor: scheme === 'night' ? colors.card : undefined }}>
                 <PannableGrid
                     gridSize={GRID_SIZE}
                     tileSize={TILE_SIZE}

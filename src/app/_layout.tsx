@@ -7,6 +7,7 @@ import { ClerkProvider } from "@clerk/expo";
 import { tokenCache } from "@clerk/expo/token-cache";
 
 import { GardenDomainProvider } from "@/context/garden-domain-store";
+import { GardenThemeProvider } from "@/context/garden-theme-store";
 import { QuestDomainProvider } from "@/context/quest-domain-store";
 import { loadSoundPreference } from "@/lib/sound";
 
@@ -47,7 +48,9 @@ export default function RootLayout() {
         <GestureHandlerRootView style={{ flex: 1 }}>
           <GardenDomainProvider>
             <QuestDomainProvider>
-              <Stack screenOptions={{headerShown: false}} />
+              <GardenThemeProvider>
+                <Stack screenOptions={{headerShown: false}} />
+              </GardenThemeProvider>
             </QuestDomainProvider>
           </GardenDomainProvider>
         </GestureHandlerRootView>
