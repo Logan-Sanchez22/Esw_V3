@@ -246,17 +246,18 @@ const Garden = () => {
 
                         return (
                             <View style={isPreview ? { opacity: 0.55 } : undefined}>
-                                {/* Invisible — exists only so this decoration's height/anchor
-                                 math matches this tile's own ground sprite's (same variant,
-                                 since variants can differ slightly in native size), without
-                                 duplicating the sprite sizing logic. Drawing is handled by
-                                 the ground pass. */}
-                                <AtlasSprite
-                                    atlas={isoBlocksAtlas}
-                                    sprite={getGroundSpriteKey(tile.ground, index)}
-                                    size={TILE_WIDTH}
-                                    style={{ opacity: 0 }}
-                                />
+                                {/* Reference box matching the tile's own TOP FACE — this tile
+                                 set draws each tile as a pseudo-3D block (flat top + shaded
+                                 sides, see the TILE_HEIGHT_STEP comment above), and a
+                                 decoration should stand on the flat top, not at the base of
+                                 the whole block. Anchoring to the full sprite height here
+                                 (as an earlier version of this did, via an invisible copy of
+                                 the ground sprite) put a decoration's visual base ~22px below
+                                 the tile's own outline — barely noticeable before the outline
+                                 existed, obviously wrong once it did (confirmed on-device: a
+                                 bush's canopy sat straddling the outline's bottom vertex
+                                 instead of standing inside it). */}
+                                <View style={{ width: TILE_WIDTH, height: TILE_HEIGHT_STEP }} />
 
                                 <View
                                     style={{
