@@ -30,6 +30,18 @@ export const colors = {
     // independently in garden.tsx's TILE_OUTLINE_COLOR and garden-alt.tsx's
     // border-color fallback.
     tileOutline: "#4A3728",
+    // Average color of the top-down ground atlas's actual grass tile
+    // (sampled from assets/images/garden-topdown/spring_forest.png's grass
+    // rect, not guessed) — garden-alt.tsx's grid dimming blends toward this
+    // instead of using an alpha-transparent border. A transparent border
+    // shows whatever's directly behind THAT one tile's edge, which varies
+    // pixel to pixel across the grass texture, so two adjacent tiles' borders
+    // (each tile draws its own) blended inconsistently and read as a muddy,
+    // uneven line rather than a clean dim one — confirmed by on-device
+    // feedback after shipping the alpha version. Blending to a flat solid
+    // color first avoids that: every tile's border is the same exact color
+    // regardless of what's under it.
+    topDownGrassBase: "#5A8550",
 } as const;
 
 // Five sizes, covering every screen in the app — see the UI Overhaul Roadmap's
@@ -46,11 +58,12 @@ export const typography = {
 
 /**
  * How visible the garden screens' per-tile grid outline is, keyed by the
- * screen's current mode — same values drive both IsometricGrid's SVG
- * strokeOpacity and garden-alt.tsx's View borderColor alpha (via withAlpha
- * below), so the grid recedes by the same amount in both views for the same
- * mode instead of two independently-tuned numbers. Paint mode keeps it most
- * visible (you're deciding tile boundaries); Interact mode dims it most
+ * screen's current mode — drives both IsometricGrid's SVG strokeOpacity
+ * directly, and garden-alt.tsx's solid blended border color (via mixColors
+ * below: `1 - gridOutlineOpacity[mode]` toward topDownGrassBase) — same
+ * underlying "how much should this recede" values for both views, applied
+ * however each rendering technique actually needs it. Paint mode keeps it
+ * most visible (you're deciding tile boundaries); Interact mode dims it most
  * (you're just looking/moving things, the grid should stay out of the way);
  * Decorate sits in between. Never fully 0 — a preview/flash tile's own
  * outline always overrides this and stays fully opaque regardless of mode.
@@ -68,6 +81,19 @@ export function withAlpha(hex: string, alpha: number): string {
     const g = parseInt(hex.slice(3, 5), 16);
     const b = parseInt(hex.slice(5, 7), 16);
     return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
+/** Linear-interpolates two "#rrggbb" colors into a third solid "#rrggbb" —
+ * t=0 is hexA, t=1 is hexB. Used instead of withAlpha wherever the color
+ * needs to stay solid (opaque) rather than see-through — e.g. a View
+ * border drawn over a busy, non-uniform texture, where transparency would
+ * blend inconsistently depending on what's directly underneath. */
+export function mixColors(hexA: string, hexB: string, t: number): string {
+    const a = { r: parseInt(hexA.slice(1, 3), 16), g: parseInt(hexA.slice(3, 5), 16), b: parseInt(hexA.slice(5, 7), 16) };
+    const b = { r: parseInt(hexB.slice(1, 3), 16), g: parseInt(hexB.slice(3, 5), 16), b: parseInt(hexB.slice(5, 7), 16) };
+    const mix = (x: number, y: number) => Math.round(x + (y - x) * t);
+    const toHex = (n: number) => n.toString(16).padStart(2, '0');
+    return `#${toHex(mix(a.r, b.r))}${toHex(mix(a.g, b.g))}${toHex(mix(a.b, b.b))}`;
 }
 
 // One shared "raised card" shadow — used sparingly (stat cards, not every

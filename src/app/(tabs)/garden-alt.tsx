@@ -34,7 +34,7 @@ import {
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
-import { colors, gridOutlineOpacity, withAlpha } from '../../../constants/theme';
+import { colors, gridOutlineOpacity, mixColors } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -301,7 +301,7 @@ const GardenAlt = () => {
                                         ? colors.flash
                                         : isHighlighted
                                           ? colors.highlight
-                                          : withAlpha(colors.tileOutline, gridOutlineOpacity[mode]),
+                                          : mixColors(colors.tileOutline, colors.topDownGrassBase, 1 - gridOutlineOpacity[mode]),
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',
