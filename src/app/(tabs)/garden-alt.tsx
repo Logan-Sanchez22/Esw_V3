@@ -18,6 +18,7 @@ import { PannableGrid } from '@/components/PannableGrid';
 import { ScreenHeader, StatPill } from '@/components/ui';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
+import { pickVariant } from '@/lib/variantPick';
 import {
     CATALOG,
     CATALOG_CATEGORIES,
@@ -67,6 +68,20 @@ const GROUND_SPRITE: Record<string, keyof typeof topDownGroundAtlas.sprites> = {
     dirt: 'dirt',
     water: 'water',
 };
+
+// A few plain grass variants (checked against the actual sprite sheet — see
+// topdown-ground-atlas.ts's own comment on which candidates were rejected).
+// Repeating 'grass' weights it higher, same convention as the isometric
+// screen's GRASS_VARIANTS — the common case stays common.
+const GRASS_VARIANTS: readonly (keyof typeof topDownGroundAtlas.sprites)[] = ['grass', 'grass', 'grass2', 'grass3', 'grass4'];
+
+// Deterministic per-tile pick (same tile always renders the same variant, no
+// new persisted field needed) — dirt/water have no variant list, so they
+// always fall through to their single GROUND_SPRITE entry.
+function getGroundSpriteKey(groundId: string, tileIndex: number): keyof typeof topDownGroundAtlas.sprites {
+    if (groundId === 'grass') return pickVariant(tileIndex, GRASS_VARIANTS);
+    return GROUND_SPRITE[groundId] ?? 'grass';
+}
 
 const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => ground.id in GROUND_SPRITE).map(
     (ground) => ({
@@ -288,7 +303,7 @@ const GardenAlt = () => {
                         const isGhost = isDecoratePreview || isMovePreview;
                         const isHighlighted = isDecoratePreview || isMovePreview || isInteractSelected;
                         const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
-                        const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
+                        const groundKey = getGroundSpriteKey(tile.ground, i);
                         const decorationSize = TILE_SIZE * (itemId ? getCatalogItem(itemId)?.visualScale ?? 1 : 1);
 
                         return (
