@@ -7,6 +7,7 @@ import {
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { AmbientParticles } from '@/components/AmbientParticles';
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { DecorationInfoCard } from '@/components/DecorationInfoCard';
 import { DecorationShadow } from '@/components/DecorationShadow';
@@ -86,9 +87,15 @@ const GROUND_VARIANTS: Partial<Record<string, readonly IsoBlockKey[]>> = {
 };
 
 // Deterministic per-tile pick (same tile always renders the same variant,
-// no new persisted field needed) — water/stonePath have no variant list, so
-// they always fall through to their single GROUND_SPRITE entry.
-function getGroundSpriteKey(groundId: string, tileIndex: number): keyof typeof isoBlocksAtlas.sprites {
+// no new persisted field needed) — stonePath has no variant list, so it
+// always falls through to its single GROUND_SPRITE entry. Water instead
+// rotates through the atlas's waterPlain/waterRipple pair as waterTick
+// advances — a rotating subset of tiles (one in five) shows the ripple
+// frame each tick, so the whole pond doesn't blink in lockstep.
+function getGroundSpriteKey(groundId: string, tileIndex: number, waterTick: number): keyof typeof isoBlocksAtlas.sprites {
+    if (groundId === 'water') {
+        return (tileIndex + waterTick) % 5 === 0 ? 'waterRipple' : 'waterPlain';
+    }
     const variants = GROUND_VARIANTS[groundId];
     if (variants) return pickVariant(tileIndex, variants);
     return GROUND_SPRITE[groundId] ?? 'grassFlat';
@@ -164,6 +171,17 @@ const Garden = () => {
     useEffect(() => () => {
         if (flashTimer.current) clearTimeout(flashTimer.current);
     }, []);
+
+    // Advances the water-ripple frame on a timer, but only while a water
+    // tile actually exists — no point re-rendering the whole 225-tile grid
+    // on an interval for a garden with no pond.
+    const hasWater = useMemo(() => state.tiles.some((tile) => tile.ground === 'water'), [state.tiles]);
+    const [waterTick, setWaterTick] = useState(0);
+    useEffect(() => {
+        if (!hasWater) return;
+        const id = setInterval(() => setWaterTick((t) => t + 1), 1200);
+        return () => clearInterval(id);
+    }, [hasWater]);
 
     // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
     // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
@@ -304,7 +322,7 @@ const Garden = () => {
                     renderGround={(index) => (
                         <AtlasSprite
                             atlas={isoBlocksAtlas}
-                            sprite={getGroundSpriteKey(state.tiles[index].ground, index)}
+                            sprite={getGroundSpriteKey(state.tiles[index].ground, index, waterTick)}
                             size={TILE_WIDTH}
                         />
                     )}
@@ -370,6 +388,7 @@ const Garden = () => {
                         );
                     }}
                 />
+                <AmbientParticles seed={1} />
                 {previewIndex !== null && (
                     <PlacementConfirmBar
                         itemLabel={getCatalogItem(selectedItemId)?.label ?? 'item'}

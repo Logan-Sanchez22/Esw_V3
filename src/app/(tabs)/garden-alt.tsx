@@ -6,6 +6,7 @@ import {
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
 
+import { AmbientParticles } from '@/components/AmbientParticles';
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { DecorationInfoCard } from '@/components/DecorationInfoCard';
 import { DecorationShadow } from '@/components/DecorationShadow';
@@ -124,6 +125,20 @@ const GardenAlt = () => {
     useEffect(() => () => {
         if (flashTimer.current) clearTimeout(flashTimer.current);
     }, []);
+
+    // Advances the water-shimmer frame on a timer, but only while a water
+    // tile actually exists — no point re-rendering the whole 225-tile grid
+    // on an interval for a garden with no pond. The top-down ground atlas
+    // has only one water sprite (checked — no ripple frame like the iso
+    // atlas), so the shimmer is a translucent overlay rather than a
+    // sprite-swap; same rotating-subset trick either way.
+    const hasWater = useMemo(() => state.tiles.some((tile) => tile.ground === 'water'), [state.tiles]);
+    const [waterTick, setWaterTick] = useState(0);
+    useEffect(() => {
+        if (!hasWater) return;
+        const id = setInterval(() => setWaterTick((t) => t + 1), 1200);
+        return () => clearInterval(id);
+    }, [hasWater]);
 
     // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
     // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
@@ -283,6 +298,12 @@ const GardenAlt = () => {
                                 }}
                             >
                                 <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
+                                {tile.ground === 'water' && (i + waterTick) % 5 === 0 && (
+                                    <View
+                                        pointerEvents="none"
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.18)' }}
+                                    />
+                                )}
                                 {isFlash && (
                                     <View
                                         pointerEvents="none"
@@ -312,6 +333,7 @@ const GardenAlt = () => {
                         );
                     }}
                 />
+                <AmbientParticles seed={2} />
                 {previewIndex !== null && (
                     <PlacementConfirmBar
                         itemLabel={getCatalogItem(selectedItemId)?.label ?? 'item'}
