@@ -8,7 +8,7 @@ import { useUser } from "@clerk/expo";
 import { Button, Card, EmptyState, ScreenHeader, SectionHeading, StatPill } from '@/components/ui';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useQuestDomain } from '@/context/quest-domain-store';
-import { QUESTS } from '@/lib/quest-domain';
+import { completedTodayCount, QUESTS } from '@/lib/quest-domain';
 import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
@@ -18,7 +18,7 @@ export default function Home() {
     const { state: gardenState } = useGardenDomain();
     const { state: questState, isCompleted } = useQuestDomain();
 
-    const completedCount = questState.completedQuestIds.length;
+    const completedCount = completedTodayCount(questState);
     const nextQuest = QUESTS.find((quest) => !isCompleted(quest.id));
     const firstName = user?.firstName ?? user?.primaryEmailAddress?.emailAddress?.split('@')[0] ?? 'there';
 
@@ -30,7 +30,7 @@ export default function Home() {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3], marginBottom: spacing[2] }}>
                     <StatPill label="points" value={gardenState.points} />
                     <StatPill label="earned" value={gardenState.totalPointsEarned} />
-                    <StatPill label={`/ ${QUESTS.length} quests`} value={completedCount} />
+                    <StatPill label={`/ ${QUESTS.length} today`} value={completedCount} />
                 </View>
 
                 <SectionHeading title="Your Gardens" />
@@ -72,8 +72,8 @@ export default function Home() {
                 ) : (
                     <EmptyState
                         icon={<Text style={{ fontSize: 32 }}>🌿</Text>}
-                        title="All quests complete!"
-                        message="You've finished every quest — nice work. Check back soon for more."
+                        title="All done for today!"
+                        message="You've finished every quest for today — they'll be back tomorrow for more points."
                         actionLabel="View Quests"
                         onAction={() => router.push('/quest-page')}
                     />

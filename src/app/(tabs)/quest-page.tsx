@@ -27,8 +27,8 @@ const QuestPage = () => {
             {allComplete ? (
                 <EmptyState
                     icon={<Text style={{ fontSize: 32 }}>🌿</Text>}
-                    title="All quests complete!"
-                    message="Nice work — you've finished every quest. Check back soon for more."
+                    title="All done for today!"
+                    message="Nice work — you've finished every quest for today. They'll be back tomorrow for more points."
                 />
             ) : (
                 <ScrollView contentContainerStyle={{ padding: spacing[5], paddingTop: spacing[2], gap: spacing[3] }}>
@@ -59,14 +59,32 @@ const QuestPage = () => {
                                         {quest.description}
                                     </Text>
 
-                                    <Button
-                                        label={completed ? 'Completed ✓' : `Complete (+${quest.points} pts)`}
-                                        disabled={completed}
-                                        onPress={() => {
-                                            completeQuest(quest.id);
-                                            addPoints(quest.points);
-                                        }}
-                                    />
+                                    {completed ? (
+                                        // A quiet, non-button row instead of a dimmed Button — a
+                                        // disabled button still looks like an action waiting to be
+                                        // taken; this reads unambiguously as "nothing to do here,"
+                                        // so it doesn't compete with whatever's still actionable
+                                        // elsewhere on the screen.
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                                            <Text
+                                                style={{
+                                                    color: colors.mutedForeground,
+                                                    fontSize: typography.label.fontSize,
+                                                    fontFamily: typography.label.fontFamily,
+                                                }}
+                                            >
+                                                ✓ Completed today
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <Button
+                                            label={`Complete (+${quest.points} pts)`}
+                                            onPress={() => {
+                                                completeQuest(quest.id);
+                                                addPoints(quest.points);
+                                            }}
+                                        />
+                                    )}
                                 </Card>
                             </View>
                         );

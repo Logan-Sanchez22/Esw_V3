@@ -51,20 +51,46 @@ export const QUESTS: Quest[] = [
     },
 ];
 
+/** Device-local calendar date as "YYYY-MM-DD" — quests reset at local
+ * midnight, not a rolling 24h window from whenever they were last done
+ * (simpler to reason about, and matches how the quest copy already reads:
+ * "today," "for one trip today"). */
+export function todayDateKey(): string {
+    const now = new Date();
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const day = String(now.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+}
+
 export type QuestDomainState = {
-    /** Quests are one-time for now — no daily/weekly reset logic yet. */
-    completedQuestIds: string[];
+    /**
+     * Maps a quest id to the calendar date it was last completed on. A
+     * quest counts as completed only if that date is today — no explicit
+     * "reset" step runs anywhere; isQuestCompleted just checks the date
+     * live, so a quest silently becomes available again the next calendar
+     * day on its own, correctly even if the app was closed for days.
+     * Quests award real (non-refundable) points on every completion, same
+     * as before — this only changes how long "completed" lasts.
+     */
+    completedAt: Record<string, string>;
 };
 
 export function createEmptyQuestState(): QuestDomainState {
-    return { completedQuestIds: [] };
+    return { completedAt: {} };
 }
 
 export function isQuestCompleted(state: QuestDomainState, questId: string): boolean {
-    return state.completedQuestIds.includes(questId);
+    return state.completedAt[questId] === todayDateKey();
 }
 
 export function completeQuest(state: QuestDomainState, questId: string): QuestDomainState {
     if (isQuestCompleted(state, questId)) return state;
-    return { completedQuestIds: [...state.completedQuestIds, questId] };
+    return { completedAt: { ...state.completedAt, [questId]: todayDateKey() } };
+}
+
+/** How many of today's quests are done — replaces the old all-time
+ * completedQuestIds.length now that completion resets daily. */
+export function completedTodayCount(state: QuestDomainState): number {
+    return QUESTS.filter((quest) => isQuestCompleted(state, quest.id)).length;
 }

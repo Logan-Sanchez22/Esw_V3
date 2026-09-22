@@ -5,7 +5,7 @@ import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/expo";
 
 import { Button, ScreenHeader, SectionHeading, StatPill } from '@/components/ui';
-import { QUESTS } from '@/lib/quest-domain';
+import { completedTodayCount, QUESTS } from '@/lib/quest-domain';
 import { useQuestDomain } from '@/context/quest-domain-store';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { colors, spacing, typography } from '../../../constants/theme';
@@ -58,7 +58,7 @@ const Settings = () => {
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: spacing[3] }}>
                     <StatPill label="points" value={gardenState.points} />
                     <StatPill label="earned" value={gardenState.totalPointsEarned} />
-                    <StatPill label={`/ ${QUESTS.length} quests`} value={questState.completedQuestIds.length} />
+                    <StatPill label={`/ ${QUESTS.length} today`} value={completedTodayCount(questState)} />
                 </View>
                 <Text
                     style={{
@@ -85,12 +85,12 @@ const Settings = () => {
                         }
                     />
                     <Button
-                        label="Reset Quests"
+                        label="Reset Today's Quests"
                         variant="danger"
                         onPress={() =>
                             confirmReset(
-                                'Reset quests?',
-                                'This marks every quest as incomplete again, so you can redo them for points.',
+                                "Reset today's quests?",
+                                "Quests already reset on their own every day — this just marks today's as incomplete again right now, so you can redo them without waiting for tomorrow.",
                                 resetQuests
                             )
                         }

@@ -171,16 +171,20 @@ export function moveItem(state: GardenDomainState, fromIndex: number, toIndex: n
  * has art in every atlas yet, so a screen may only show a subset of this list.
  */
 export const CATALOG: CatalogItem[] = [
-  // unlockThreshold picks: quests award ~65 points total (one-time, 5-25
-  // each) — 20 is reachable after a couple of modest quests (an early
-  // motivator), 50 takes most of them (a capstone reward for the priciest
-  // item). Everything else stays unlocked from the start.
+  // unlockThreshold ladder: 5 checkpoints (20/30/40/50/70) instead of the
+  // original 2 (20/50) — now that quests are daily-repeatable (see
+  // quest-domain.ts), totalPointsEarned keeps growing indefinitely instead
+  // of maxing out around one one-time ~65pt run, so there's room for an
+  // ongoing "next unlock" beyond the first session. Cheap basics (treeBare,
+  // bush, flower, rock, log, grassTuft) stay free from the start so a fresh
+  // garden isn't empty on day one — only the "one more variant"/capstone
+  // items are gated.
   { id: 'tree', label: 'Tree', cost: 12, visualScale: 1, unlockThreshold: 20, category: 'trees' },
   { id: 'treeBare', label: 'Bare Tree', cost: 8, visualScale: 0.9, category: 'trees' },
   { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55, category: 'plants' },
-  { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55, category: 'plants' },
+  { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55, unlockThreshold: 30, category: 'plants' },
   { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
-  { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, category: 'nature' },
+  { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, unlockThreshold: 40, category: 'nature' },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },
   { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures' },
@@ -188,7 +192,7 @@ export const CATALOG: CatalogItem[] = [
   // extracted from misc.png so far (lily pads/grass tufts aren't part of
   // that sheet's subject matter). Same asymmetry the iso side already has
   // in the other direction (bench, most flower colors).
-  { id: 'lilyPad', label: 'Lily Pad', cost: 2, visualScale: 0.4, category: 'plants' },
+  { id: 'lilyPad', label: 'Lily Pad', cost: 2, visualScale: 0.4, unlockThreshold: 70, category: 'plants' },
   { id: 'grassTuft', label: 'Grass Tuft', cost: 1, visualScale: 0.3, category: 'plants' },
 ];
 
