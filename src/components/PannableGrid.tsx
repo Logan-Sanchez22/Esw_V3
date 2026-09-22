@@ -1,7 +1,7 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { View, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 4;
@@ -16,6 +16,8 @@ type Props = {
     /** Height reserved above the viewport for header/points text, so the grid fills the rest of the screen. */
     headerHeight?: number;
     renderTile: (index: number) => ReactNode;
+    /** Eases the camera to center on this tile once, when `token` changes — see IsometricGrid's identical prop. */
+    flyTo?: { index: number; token: number } | null;
 };
 
 /** Centers content along one axis when it's smaller than the viewport (rather than
@@ -37,7 +39,7 @@ function clampAxis(value: number, contentSize: number, viewportSize: number) {
  * garden.tsx and garden-alt.tsx — the pan/zoom/clamping behavior must stay
  * identical between the two art styles, so it lives here once.
  */
-export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile }: Props) {
+export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile, flyTo }: Props) {
     const { width: viewportWidth, height: windowHeight } = useWindowDimensions();
     const viewportHeight = windowHeight - headerHeight;
     const mapSize = gridSize * tileSize;
@@ -92,6 +94,27 @@ export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile 
         });
 
     const composedGesture = Gesture.Simultaneous(panGesture, pinchGesture);
+
+    // One-off "fly to" pan, requested by the parent (e.g. after confirming a
+    // placement or move) — see IsometricGrid's identical effect.
+    useEffect(() => {
+        if (!flyTo) return;
+
+        const row = Math.floor(flyTo.index / gridSize);
+        const col = flyTo.index % gridSize;
+        const centerX = col * tileSize + tileSize / 2;
+        const centerY = row * tileSize + tileSize / 2;
+
+        const currentScale = scale.value;
+        const targetX = clampX(viewportWidth / 2 - centerX * currentScale, currentScale);
+        const targetY = clampY(viewportHeight / 2 - centerY * currentScale, currentScale);
+
+        translateX.value = withTiming(targetX, { duration: 450, easing: Easing.out(Easing.cubic) });
+        translateY.value = withTiming(targetY, { duration: 450, easing: Easing.out(Easing.cubic) });
+        savedTranslateX.value = targetX;
+        savedTranslateY.value = targetY;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flyTo?.token]);
 
     const mapAnimatedStyle = useAnimatedStyle(() => ({
         transform: [

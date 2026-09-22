@@ -3,8 +3,10 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { View, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+    Easing,
     useAnimatedStyle,
     useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
 import Svg, { Polygon } from 'react-native-svg';
 
@@ -45,6 +47,14 @@ type Props = {
      * preview outline. */
     flashIndex?: number | null;
     flashColor?: string;
+    /** Eases the camera to center on this tile once, when `token` changes —
+     * a bump-free way for the parent to request a one-off pan without
+     * fighting the gesture-driven translate/scale shared values below.
+     * `token` (not `index` alone) is the trigger so re-flying to the same
+     * tile twice in a row (e.g. two placements at the same spot) still
+     * fires. Reusing the same withTiming-driven shared values the pan/pinch
+     * gestures already animate, so it composes with them for free. */
+    flyTo?: { index: number; token: number } | null;
 };
 
 function clampAxis(
@@ -76,6 +86,7 @@ export function IsometricGrid({
                                   highlightColor,
                                   flashIndex,
                                   flashColor,
+                                  flyTo,
                               }: Props) {
     const [viewport, setViewport] = useState({
         width: 0,
@@ -157,6 +168,31 @@ export function IsometricGrid({
             viewportHeight
         );
     };
+
+    // One-off "fly to" pan, requested by the parent (e.g. after confirming a
+    // placement or move) — reads current scale, so it composes with whatever
+    // zoom level the user already has rather than resetting it.
+    useEffect(() => {
+        if (!flyTo || viewportWidth === 0 || viewportHeight === 0) return;
+
+        const row = Math.floor(flyTo.index / gridSize);
+        const col = flyTo.index % gridSize;
+
+        const tileX = (col - row) * (tileWidth / 2) + originOffsetX;
+        const tileY = (col + row) * (tileHeightStep / 2);
+        const centerX = tileX + tileWidth / 2;
+        const centerY = tileY + tileHeightStep / 2;
+
+        const currentScale = scale.value;
+        const targetX = clampX(viewportWidth / 2 - centerX * currentScale, currentScale);
+        const targetY = clampY(viewportHeight / 2 - centerY * currentScale, currentScale);
+
+        translateX.value = withTiming(targetX, { duration: 450, easing: Easing.out(Easing.cubic) });
+        translateY.value = withTiming(targetY, { duration: 450, easing: Easing.out(Easing.cubic) });
+        savedTranslateX.value = targetX;
+        savedTranslateY.value = targetY;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flyTo?.token]);
 
     const panGesture = Gesture.Pan()
         .onUpdate((e) => {

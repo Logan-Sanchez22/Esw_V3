@@ -150,6 +150,16 @@ const Garden = () => {
         setMovePreviewIndex(null);
     };
 
+    // Eases the camera to a tile once, after a placement/move is confirmed —
+    // token increments on every request so flying to the same tile twice in
+    // a row still fires (IsometricGrid keys its effect off token, not index).
+    const [flyTo, setFlyTo] = useState<{ index: number; token: number } | null>(null);
+    const flyTokenRef = useRef(0);
+    const flyToTile = (index: number) => {
+        flyTokenRef.current += 1;
+        setFlyTo({ index, token: flyTokenRef.current });
+    };
+
     // Leaving interact mode drops any selection/move in progress.
     useEffect(() => {
         if (mode !== 'interact') {
@@ -259,6 +269,7 @@ const Garden = () => {
                     highlightColor={PREVIEW_HIGHLIGHT_COLOR}
                     flashIndex={invalidFlashIndex}
                     flashColor="#ef4444"
+                    flyTo={flyTo}
                     onTilePress={(index) => {
                         if (mode === 'paint') {
                             paintGround(index, selectedGroundId);
@@ -395,7 +406,10 @@ const Garden = () => {
                         bottom={bottomNavSpace + 12}
                         onConfirm={() => {
                             const item = getCatalogItem(selectedItemId);
-                            if (item && previewIndex !== null) placeItem(previewIndex, item);
+                            if (item && previewIndex !== null) {
+                                placeItem(previewIndex, item);
+                                flyToTile(previewIndex);
+                            }
                             setPreviewIndex(null);
                         }}
                         onCancel={() => setPreviewIndex(null)}
@@ -421,7 +435,10 @@ const Garden = () => {
                         actionLabel="Move"
                         bottom={bottomNavSpace + 12}
                         onConfirm={() => {
-                            if (moveFromIndex !== null) moveItem(moveFromIndex, movePreviewIndex);
+                            if (moveFromIndex !== null) {
+                                moveItem(moveFromIndex, movePreviewIndex);
+                                flyToTile(movePreviewIndex);
+                            }
                             cancelMove();
                         }}
                         onCancel={cancelMove}
