@@ -13,9 +13,7 @@ import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
-import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
-import { topDownProps32Atlas, topDownProps48Atlas } from '@/lib/atlases/topdown-props-atlas';
-import { topDownSmall16Atlas, topDownTuft16x32Atlas } from '@/lib/atlases/topdown-small-atlas';
+import { getDecorationSprite } from '@/lib/decorations';
 import {
     CATALOG,
     GRID_SIZE,
@@ -40,33 +38,9 @@ const MODE_OPTIONS = [
     { id: 'paint' as const, label: '🎨 Ground' },
 ];
 
-// This atlas set doesn't have art for every catalog id (no bench, no
-// second bush/tree shade) — those ids are simply left out below, so this
-// screen's picker shows a subset of the isometric screen's. That's expected:
-// the handoff notes top-down ground/decoration coverage lags the iso set.
-const ITEM_SPRITE = {
-    tree: { atlas: topDownTreesAtlas, key: 'treeCherryPink' as const },
-    // treeTeal (topDownTreesAtlas) turned out to be a flat, low-detail round
-    // canopy silhouette — confirmed on-device it reads as an unrecognizable
-    // blob at decoration size, and doesn't look like a "bare tree" at all.
-    // A stump is a much more honest fit for that concept, and has real
-    // wood-grain detail that survives being scaled down. stumpSmall (32x32,
-    // topDownProps32Atlas) stays available for a future distinct catalog
-    // item if wanted.
-    treeBare: { atlas: topDownProps48Atlas, key: 'stumpBig' as const },
-    bush: { atlas: topDownProps32Atlas, key: 'flowerBushOrange' as const },
-    bushAlt: { atlas: topDownProps32Atlas, key: 'flowerBushYellow' as const },
-    flower: { atlas: topDownSmall16Atlas, key: 'tulipPink' as const },
-    mushroom: { atlas: topDownSmall16Atlas, key: 'mushroomCluster' as const },
-    rock: { atlas: topDownProps32Atlas, key: 'rockGray' as const },
-    log: { atlas: topDownProps32Atlas, key: 'logPileAngled' as const },
-    // Top-down only — see the comment on these two in CATALOG.
-    lilyPad: { atlas: topDownProps32Atlas, key: 'lilyPadFlower' as const },
-    grassTuft: { atlas: topDownTuft16x32Atlas, key: 'grassTuftTall' as const },
-};
-
 // Top-down ground atlas only has grass/dirt/water — no stone-path equivalent,
-// so that GROUND_CATALOG entry is filtered out below, same idea as ITEM_SPRITE.
+// so that GROUND_CATALOG entry is filtered out below, same idea as the
+// decoration coverage gaps in src/lib/decorations.ts.
 const GROUND_SPRITE: Record<string, keyof typeof topDownGroundAtlas.sprites> = {
     grass: 'grass',
     dirt: 'dirt',
@@ -75,13 +49,13 @@ const GROUND_SPRITE: Record<string, keyof typeof topDownGroundAtlas.sprites> = {
 
 const PICKER_ITEMS: PickerEntry[] = [
     { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-    ...CATALOG.filter((item) => item.id in ITEM_SPRITE).map((item) => {
-        const deco = ITEM_SPRITE[item.id as keyof typeof ITEM_SPRITE];
+    ...CATALOG.filter((item) => getDecorationSprite(item.id, 'topDown')).map((item) => {
+        const deco = getDecorationSprite(item.id, 'topDown')!;
         return {
             id: item.id,
             label: item.label,
             cost: item.cost,
-            icon: <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={PICKER_ICON_SIZE} />,
+            icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
         };
     }),
 ];
@@ -155,7 +129,7 @@ const GardenAlt = () => {
                         const tile = state.tiles[i];
                         const isPreview = i === previewIndex;
                         const itemId = isPreview ? selectedItemId : tile.item;
-                        const deco = itemId ? ITEM_SPRITE[itemId as keyof typeof ITEM_SPRITE] : null;
+                        const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
                         const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
                         const decorationSize = TILE_SIZE * (itemId ? getCatalogItem(itemId)?.visualScale ?? 1 : 1);
 
@@ -203,7 +177,7 @@ const GardenAlt = () => {
                                         }}
                                     >
                                         {deco ? (
-                                            <AtlasSprite atlas={deco.atlas as any} sprite={deco.key as any} size={decorationSize} />
+                                            <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={decorationSize} />
                                         ) : (
                                             // Placed via the other screen with no top-down art yet
                                             // (e.g. bench) — see UnknownItemMarker.

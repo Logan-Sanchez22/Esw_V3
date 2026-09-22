@@ -14,7 +14,7 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
-import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
+import { getDecorationSprite } from '@/lib/decorations';
 import {
     CATALOG,
     GRID_SIZE,
@@ -55,18 +55,6 @@ const MODE_OPTIONS = [
     { id: 'paint' as const, label: '🎨 Ground' },
 ];
 
-const ITEM_SPRITE: Record<string, keyof typeof isoDecorationAtlas.sprites> = {
-    tree: 'treeFullGrown',
-    treeBare: 'treeBare',
-    bush: 'bushRound1',
-    bushAlt: 'bushRound2',
-    flower: 'flowerBunchRed',
-    mushroom: 'mushroomRed',
-    rock: 'rockBoulder',
-    log: 'logPair',
-    bench: 'benchDetailed',
-};
-
 // All 47 iso ground tiles exist in the atlas — these four are the curated
 // selection exposed as paintable ground types (see GROUND_CATALOG).
 const GROUND_SPRITE: Record<string, keyof typeof isoBlocksAtlas.sprites> = {
@@ -77,22 +65,19 @@ const GROUND_SPRITE: Record<string, keyof typeof isoBlocksAtlas.sprites> = {
 };
 
 // Not every catalog entry has iso art (lilyPad/grassTuft are top-down only) —
-// filter to what ITEM_SPRITE actually covers, same pattern garden-alt.tsx
-// already uses. Plus a "Remove" tool at the front for clearing a tile.
+// filter to what has an isometric sprite in the shared registry. Plus a
+// "Remove" tool at the front for clearing a tile.
 const PICKER_ITEMS: PickerEntry[] = [
     { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-    ...CATALOG.filter((item) => item.id in ITEM_SPRITE).map((item) => ({
-        id: item.id,
-        label: item.label,
-        cost: item.cost,
-        icon: (
-            <AtlasSprite
-                atlas={isoDecorationAtlas}
-                sprite={ITEM_SPRITE[item.id]}
-                size={PICKER_ICON_SIZE}
-            />
-        ),
-    })),
+    ...CATALOG.filter((item) => getDecorationSprite(item.id, 'isometric')).map((item) => {
+        const sprite = getDecorationSprite(item.id, 'isometric')!;
+        return {
+            id: item.id,
+            label: item.label,
+            cost: item.cost,
+            icon: <AtlasSprite atlas={sprite.atlas} sprite={sprite.key} size={PICKER_ICON_SIZE} />,
+        };
+    }),
 ];
 
 const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
@@ -206,7 +191,7 @@ const Garden = () => {
                         const itemId = isPreview ? selectedItemId : tile.item;
                         if (!itemId) return null;
 
-                        const sprite = ITEM_SPRITE[itemId];
+                        const sprite = getDecorationSprite(itemId, 'isometric');
                         const catalogItem = getCatalogItem(itemId);
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
 
@@ -232,8 +217,8 @@ const Garden = () => {
                                 >
                                     {sprite ? (
                                         <AtlasSprite
-                                            atlas={isoDecorationAtlas}
-                                            sprite={sprite}
+                                            atlas={sprite.atlas}
+                                            sprite={sprite.key}
                                             size={decorationSize}
                                         />
                                     ) : (
