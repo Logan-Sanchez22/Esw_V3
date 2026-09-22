@@ -120,6 +120,37 @@ export function getPlacementBlock(
   return null;
 }
 
+export type MoveBlock = 'same-tile' | 'occupied' | 'non-placeable-terrain' | null;
+
+/** Why moving an already-placed item to toIndex would fail — no cost/unlock
+ * checks, since the item is already owned and paid for; only whether the
+ * destination itself can hold it. */
+export function getMoveBlock(state: GardenDomainState, fromIndex: number, toIndex: number): MoveBlock {
+  if (fromIndex === toIndex) return 'same-tile';
+  if (toIndex < 0 || toIndex >= state.tiles.length) return 'occupied';
+  const toTile = state.tiles[toIndex];
+  if (toTile.item !== null) return 'occupied';
+  if (!isGroundPlaceable(toTile.ground)) return 'non-placeable-terrain';
+  return null;
+}
+
+export function canMoveItem(state: GardenDomainState, fromIndex: number, toIndex: number): boolean {
+  if (fromIndex < 0 || fromIndex >= state.tiles.length) return false;
+  if (state.tiles[fromIndex].item === null) return false;
+  return getMoveBlock(state, fromIndex, toIndex) === null;
+}
+
+/** Moves an already-placed item to an empty, placeable tile. Free — the
+ * item is already owned; this only relocates it. */
+export function moveItem(state: GardenDomainState, fromIndex: number, toIndex: number): GardenDomainState {
+  if (!canMoveItem(state, fromIndex, toIndex)) return state;
+  const tiles = [...state.tiles];
+  const itemId = tiles[fromIndex].item;
+  tiles[fromIndex] = { ...tiles[fromIndex], item: null };
+  tiles[toIndex] = { ...tiles[toIndex], item: itemId };
+  return { ...state, tiles };
+}
+
 /**
  * The shared catalog of placeable items — same ids, labels and costs for both
  * garden screens, so picking "Tree" costs the same and behaves the same no

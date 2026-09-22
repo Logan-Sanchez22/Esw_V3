@@ -7,6 +7,7 @@ import {
 } from "react-native-safe-area-context";
 
 import { AtlasSprite } from '@/components/AtlasSprite';
+import { DecorationInfoCard } from '@/components/DecorationInfoCard';
 import { DecorationShadow } from '@/components/DecorationShadow';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
@@ -22,6 +23,7 @@ import {
     GROUND_CATALOG,
     REMOVE_TOOL_ID,
     getCatalogItem,
+    getMoveBlock,
     getPlacementBlock,
     isItemUnlocked,
 } from '@/lib/garden-domain';
@@ -34,11 +36,12 @@ const TILE_SIZE = 48;
 const PICKER_ICON_SIZE = 32;
 const HEADER_HEIGHT = 250; // title + points + mode toggle + picker + safe area
 
-type Mode = 'decorate' | 'paint';
+type Mode = 'decorate' | 'paint' | 'interact';
 
 const MODE_OPTIONS = [
     { id: 'decorate' as const, label: '🌳 Decorate' },
     { id: 'paint' as const, label: '🎨 Ground' },
+    { id: 'interact' as const, label: '👆 Interact' },
 ];
 
 // Top-down ground atlas only has grass/dirt/water — no stone-path equivalent,
@@ -67,7 +70,7 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => gro
 );
 
 const GardenAlt = () => {
-    const { state, placeItem, removeItem, paintGround } = useGardenDomain();
+    const { state, placeItem, removeItem, moveItem, paintGround } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
@@ -83,6 +86,30 @@ const GardenAlt = () => {
     useEffect(() => {
         setPreviewIndex(null);
     }, [selectedItemId, mode]);
+
+    // Interact mode: tapping a placed decoration shows an info card
+    // (interactSelectedIndex). Tapping its Move button captures which item
+    // and tile it came from (moveItemId/moveFromIndex) and switches to
+    // "pick a destination" — tapping tiles from then on previews a move
+    // there (movePreviewIndex) instead of showing the info card again.
+    const [interactSelectedIndex, setInteractSelectedIndex] = useState<number | null>(null);
+    const [moveFromIndex, setMoveFromIndex] = useState<number | null>(null);
+    const [moveItemId, setMoveItemId] = useState<string | null>(null);
+    const [movePreviewIndex, setMovePreviewIndex] = useState<number | null>(null);
+
+    const cancelMove = () => {
+        setMoveFromIndex(null);
+        setMoveItemId(null);
+        setMovePreviewIndex(null);
+    };
+
+    // Leaving interact mode drops any selection/move in progress.
+    useEffect(() => {
+        if (mode !== 'interact') {
+            setInteractSelectedIndex(null);
+            cancelMove();
+        }
+    }, [mode]);
 
     // Brief red flash on a tile that was just tapped but blocked — same
     // pattern as useStatusMessage's timeout, but keyed to a tile index
@@ -137,13 +164,21 @@ const GardenAlt = () => {
                     onSelect={setSelectedItemId}
                     points={state.points}
                 />
-            ) : (
+            ) : mode === 'paint' ? (
                 <ItemPicker
                     items={GROUND_PICKER_ITEMS}
                     selectedId={selectedGroundId}
                     onSelect={setSelectedGroundId}
                     points={state.points}
                 />
+            ) : (
+                <View className="px-5 pb-2">
+                    <Text className="text-mutedForeground">
+                        {moveFromIndex !== null
+                            ? 'Tap a tile to move it there'
+                            : 'Tap a placed item to inspect or move it'}
+                    </Text>
+                </View>
             )}
 
             <View style={{ flex: 1 }}>
@@ -153,9 +188,24 @@ const GardenAlt = () => {
                     headerHeight={HEADER_HEIGHT}
                     renderTile={(i) => {
                         const tile = state.tiles[i];
-                        const isPreview = i === previewIndex;
+                        const isDecoratePreview = i === previewIndex;
+                        const isMovePreview = i === movePreviewIndex;
+                        const isBeingMoved = i === moveFromIndex;
+                        const isInteractSelected = i === interactSelectedIndex;
                         const isFlash = i === invalidFlashIndex;
-                        const itemId = isPreview ? selectedItemId : tile.item;
+                        // Hide the source tile's real item while a move is pending — it
+                        // hasn't actually moved in domain state yet, but showing it fully
+                        // there AND a ghost at the candidate destination reads as "in two
+                        // places," not "picked up."
+                        const itemId = isBeingMoved
+                            ? null
+                            : isDecoratePreview
+                              ? selectedItemId
+                              : isMovePreview
+                                ? moveItemId
+                                : tile.item;
+                        const isGhost = isDecoratePreview || isMovePreview;
+                        const isHighlighted = isDecoratePreview || isMovePreview || isInteractSelected;
                         const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
                         const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
                         const decorationSize = TILE_SIZE * (itemId ? getCatalogItem(itemId)?.visualScale ?? 1 : 1);
@@ -165,8 +215,8 @@ const GardenAlt = () => {
                                 style={{
                                     width: TILE_SIZE,
                                     height: TILE_SIZE,
-                                    borderWidth: isPreview || isFlash ? 2 : 1,
-                                    borderColor: isFlash ? '#ef4444' : isPreview ? '#facc15' : '#4A3728',
+                                    borderWidth: isHighlighted || isFlash ? 2 : 1,
+                                    borderColor: isFlash ? '#ef4444' : isHighlighted ? '#facc15' : '#4A3728',
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',
@@ -174,6 +224,34 @@ const GardenAlt = () => {
                                 onPress={() => {
                                     if (mode === 'paint') {
                                         paintGround(i, selectedGroundId);
+                                        return;
+                                    }
+
+                                    if (mode === 'interact') {
+                                        if (moveFromIndex !== null) {
+                                            if (i === moveFromIndex) {
+                                                showMessage('Pick a different tile to move it to');
+                                                return;
+                                            }
+                                            const block = getMoveBlock(state, moveFromIndex, i);
+                                            if (block === 'occupied') {
+                                                showMessage('Tile already has something');
+                                                flashInvalid(i);
+                                            } else if (block === 'non-placeable-terrain') {
+                                                showMessage("Can't move onto water");
+                                                flashInvalid(i);
+                                            } else {
+                                                setMovePreviewIndex(i);
+                                            }
+                                            return;
+                                        }
+
+                                        if (tile.item === null) {
+                                            showMessage('Nothing to interact with here');
+                                            setInteractSelectedIndex(null);
+                                            return;
+                                        }
+                                        setInteractSelectedIndex((prev) => (prev === i ? null : i));
                                         return;
                                     }
 
@@ -217,7 +295,7 @@ const GardenAlt = () => {
                                             position: 'absolute',
                                             bottom: 0,
                                             alignSelf: 'center',
-                                            opacity: isPreview ? 0.55 : 1,
+                                            opacity: isGhost ? 0.55 : 1,
                                         }}
                                     >
                                         <DecorationShadow size={decorationSize} />
@@ -244,6 +322,32 @@ const GardenAlt = () => {
                             setPreviewIndex(null);
                         }}
                         onCancel={() => setPreviewIndex(null)}
+                    />
+                )}
+                {interactSelectedIndex !== null && (
+                    <DecorationInfoCard
+                        itemLabel={getCatalogItem(state.tiles[interactSelectedIndex].item ?? '')?.label ?? 'Item'}
+                        bottom={bottomNavSpace + 12}
+                        onMove={() => {
+                            const itemId = state.tiles[interactSelectedIndex].item;
+                            if (!itemId) return;
+                            setMoveItemId(itemId);
+                            setMoveFromIndex(interactSelectedIndex);
+                            setInteractSelectedIndex(null);
+                        }}
+                        onClose={() => setInteractSelectedIndex(null)}
+                    />
+                )}
+                {movePreviewIndex !== null && moveItemId && (
+                    <PlacementConfirmBar
+                        itemLabel={getCatalogItem(moveItemId)?.label ?? 'item'}
+                        actionLabel="Move"
+                        bottom={bottomNavSpace + 12}
+                        onConfirm={() => {
+                            if (moveFromIndex !== null) moveItem(moveFromIndex, movePreviewIndex);
+                            cancelMove();
+                        }}
+                        onCancel={cancelMove}
                     />
                 )}
             </View>

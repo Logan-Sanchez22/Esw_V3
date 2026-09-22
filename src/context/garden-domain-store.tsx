@@ -12,6 +12,7 @@ import {
     GRID_SIZE,
     PlacedItemId,
     TileState,
+    moveItem as moveItemInState,
     paintGround as paintGroundInState,
     placeItem as placeItemInState,
     removeItem as removeItemInState,
@@ -79,6 +80,7 @@ type Store = {
     state: GardenDomainState;
     placeItem: (index: number, item: CatalogItem) => void;
     removeItem: (index: number) => void;
+    moveItem: (fromIndex: number, toIndex: number) => void;
     paintGround: (index: number, groundId: string) => void;
     addPoints: (amount: number) => void;
     resetGarden: () => void;
@@ -239,6 +241,10 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         setState((prev) => removeItemInState(prev, index));
     };
 
+    const moveItem = (fromIndex: number, toIndex: number) => {
+        setState((prev) => moveItemInState(prev, fromIndex, toIndex));
+    };
+
     const paintGround = (index: number, groundId: string) => {
         setState((prev) => paintGroundInState(prev, index, groundId));
     };
@@ -253,7 +259,7 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
 
     return (
         <GardenDomainContext.Provider
-            value={{ state, placeItem, removeItem, paintGround, addPoints, resetGarden }}
+            value={{ state, placeItem, removeItem, moveItem, paintGround, addPoints, resetGarden }}
         >
             {children}
         </GardenDomainContext.Provider>

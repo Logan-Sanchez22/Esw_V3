@@ -12,11 +12,15 @@ type Props = {
     /** Distance from the bottom of the nearest positioned ancestor — differs
      * per screen depending on how much tab-bar space that screen reserves. */
     bottom: number;
+    /** "{actionLabel} {itemLabel} here?" — defaults to "Place"; interact
+     * mode's move flow reuses this same bar with "Move" instead, since the
+     * confirm/cancel-a-pending-tile shape is identical either way. */
+    actionLabel?: string;
     onConfirm: () => void;
     onCancel: () => void;
 };
 
-export function PlacementConfirmBar({ itemLabel, bottom, onConfirm, onCancel }: Props) {
+export function PlacementConfirmBar({ itemLabel, bottom, actionLabel = 'Place', onConfirm, onCancel }: Props) {
     return (
         <View
             style={{
@@ -32,7 +36,7 @@ export function PlacementConfirmBar({ itemLabel, bottom, onConfirm, onCancel }: 
                 paddingHorizontal: 14,
             }}
         >
-            <Text style={{ color: 'white', fontSize: 13 }}>Place {itemLabel} here?</Text>
+            <Text style={{ color: 'white', fontSize: 13 }}>{actionLabel} {itemLabel} here?</Text>
             <TouchableOpacity
                 onPress={onCancel}
                 style={{
