@@ -3,8 +3,15 @@ import "@/global.css"
 import {useFonts} from "expo-font";
 import {useEffect} from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
+import { ClerkProvider } from "@clerk/expo";
+import { tokenCache } from "@clerk/expo/token-cache";
 
 import { GardenDomainProvider } from "@/context/garden-domain-store";
+import { GardenThemeProvider } from "@/context/garden-theme-store";
+import { QuestDomainProvider } from "@/context/quest-domain-store";
+import { loadSoundPreference } from "@/lib/sound";
+
+const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -22,13 +29,31 @@ export default function RootLayout() {
     }
   }, [fontsLoaded])
 
+  // Fire-and-forget — sound defaults to enabled, so nothing needs to wait
+  // on this resolving before the app renders.
+  useEffect(() => {
+    loadSoundPreference();
+  }, [])
+
   if (!fontsLoaded) return null;
 
+  if (!CLERK_PUBLISHABLE_KEY) {
+    throw new Error(
+      'Missing EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY — copy .env.example to .env and fill in your Clerk publishable key.'
+    );
+  }
+
   return (
-      <GestureHandlerRootView style={{ flex: 1 }}>
-        <GardenDomainProvider>
-          <Stack screenOptions={{headerShown: false}} />
-        </GardenDomainProvider>
-      </GestureHandlerRootView>
+      <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
+        <GestureHandlerRootView style={{ flex: 1 }}>
+          <GardenDomainProvider>
+            <QuestDomainProvider>
+              <GardenThemeProvider>
+                <Stack screenOptions={{headerShown: false}} />
+              </GardenThemeProvider>
+            </QuestDomainProvider>
+          </GardenDomainProvider>
+        </GestureHandlerRootView>
+      </ClerkProvider>
   );
 }

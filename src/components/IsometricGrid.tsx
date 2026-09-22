@@ -3,9 +3,12 @@ import { ReactNode, useEffect, useRef, useState } from 'react';
 import { View, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
+    Easing,
     useAnimatedStyle,
     useSharedValue,
+    withTiming,
 } from 'react-native-reanimated';
+import Svg, { Polygon } from 'react-native-svg';
 
 const MIN_SCALE = 0.3;
 const MAX_SCALE = 4;
@@ -15,8 +18,57 @@ type Props = {
     gridSize: number;
     tileWidth: number;
     tileHeightStep: number;
-    renderTile: (index: number, row: number, col: number) => ReactNode;
+    /** The flat ground sprite for a tile. Ground tiles are drawn as one full pass,
+     * entirely behind every decoration (see `renderDecoration`) — this is what stops
+     * a "closer" tile's ground graphic from painting over a tall decoration behind it. */
+    renderGround: (index: number, row: number, col: number) => ReactNode;
+    /** What's planted/placed on a tile, or null/undefined for nothing. Decorations are
+     * drawn in a second pass, on top of every ground tile, still back-to-front sorted
+     * by row+col among themselves so two decorations still occlude each other correctly. */
+    renderDecoration?: (index: number, row: number, col: number) => ReactNode | null | undefined;
     onTilePress?: (index: number, row: number, col: number) => void;
+    /**
+     * Outline color drawn on every tile's diamond edge — a diamond of
+     * tileWidth x tileHeightStep, positioned identically to the ground tile
+     * (see the position math below). tileHeightStep must equal this tile
+     * set's real top-face height for the outline to trace the sprite's own
+     * edge exactly (it does — pixel-measured; see the constant's definition
+     * in garden.tsx). Getting this wrong once made neighboring outlines
+     * overlap, visible as double/crossing lines — verified by simulating
+     * both values against a multi-tile grid before fixing. Omit to skip
+     * drawing tile outlines.
+     */
+    tileOutlineColor?: string;
+    /** Opacity applied to the base per-tile outline ONLY — a highlighted or
+     * flashed tile's own outline always stays fully opaque regardless of this,
+     * since that's functional feedback, not ambient grid. Lets the parent dim
+     * the grid by mode (see constants/theme.ts's gridOutlineOpacity) so the
+     * garden reads as calmer to look at than to edit. Defaults to 1 (fully
+     * visible) if omitted, matching this component's original behavior. */
+    tileOutlineOpacity?: number;
+    /** Index of one tile to outline with highlightColor instead (e.g. a placement preview). */
+    highlightIndex?: number | null;
+    highlightColor?: string;
+    /** Index of one tile to fill (not just outline) with flashColor — a brief
+     * "you can't place here" cue, distinct from highlightIndex's persistent
+     * preview outline. */
+    flashIndex?: number | null;
+    flashColor?: string;
+    /** Tiles to fill with a subtle dimColor tint — a proactive "these won't
+     * work" cue shown continuously (e.g. every occupied/water tile while a
+     * decoration is selected), distinct from flashIndex's brief reactive
+     * flash after an actual blocked tap. A tile in both flashIndex and here
+     * shows the flash, not the dim — flash is the more urgent, momentary signal. */
+    dimIndices?: ReadonlySet<number>;
+    dimColor?: string;
+    /** Eases the camera to center on this tile once, when `token` changes —
+     * a bump-free way for the parent to request a one-off pan without
+     * fighting the gesture-driven translate/scale shared values below.
+     * `token` (not `index` alone) is the trigger so re-flying to the same
+     * tile twice in a row (e.g. two placements at the same spot) still
+     * fires. Reusing the same withTiming-driven shared values the pan/pinch
+     * gestures already animate, so it composes with them for free. */
+    flyTo?: { index: number; token: number } | null;
 };
 
 function clampAxis(
@@ -40,8 +92,18 @@ export function IsometricGrid({
                                   gridSize,
                                   tileWidth,
                                   tileHeightStep,
-                                  renderTile,
+                                  renderGround,
+                                  renderDecoration,
                                   onTilePress,
+                                  tileOutlineColor,
+                                  tileOutlineOpacity = 1,
+                                  highlightIndex,
+                                  highlightColor,
+                                  flashIndex,
+                                  flashColor,
+                                  dimIndices,
+                                  dimColor,
+                                  flyTo,
                               }: Props) {
     const [viewport, setViewport] = useState({
         width: 0,
@@ -123,6 +185,31 @@ export function IsometricGrid({
             viewportHeight
         );
     };
+
+    // One-off "fly to" pan, requested by the parent (e.g. after confirming a
+    // placement or move) — reads current scale, so it composes with whatever
+    // zoom level the user already has rather than resetting it.
+    useEffect(() => {
+        if (!flyTo || viewportWidth === 0 || viewportHeight === 0) return;
+
+        const row = Math.floor(flyTo.index / gridSize);
+        const col = flyTo.index % gridSize;
+
+        const tileX = (col - row) * (tileWidth / 2) + originOffsetX;
+        const tileY = (col + row) * (tileHeightStep / 2);
+        const centerX = tileX + tileWidth / 2;
+        const centerY = tileY + tileHeightStep / 2;
+
+        const currentScale = scale.value;
+        const targetX = clampX(viewportWidth / 2 - centerX * currentScale, currentScale);
+        const targetY = clampY(viewportHeight / 2 - centerY * currentScale, currentScale);
+
+        translateX.value = withTiming(targetX, { duration: 450, easing: Easing.out(Easing.cubic) });
+        translateY.value = withTiming(targetY, { duration: 450, easing: Easing.out(Easing.cubic) });
+        savedTranslateX.value = targetX;
+        savedTranslateY.value = targetY;
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [flyTo?.token]);
 
     const panGesture = Gesture.Pan()
         .onUpdate((e) => {
@@ -207,7 +294,15 @@ export function IsometricGrid({
         ],
     }));
 
-    const tiles = [];
+    const groundTiles = [];
+    const decorationTiles = [];
+    // One shared canvas for every tile's outline, rather than one <Svg> per
+    // tile — 225 independently-rasterized elements each rounded to their own
+    // sub-pixel position produced hairline seams at shared vertices between
+    // adjacent tiles, even though the underlying x/y math lines up exactly.
+    // A single Svg means adjacent tiles' edges are drawn in one coordinate
+    // space, so a shared vertex is one point, not two independently-rounded ones.
+    const outlinePolygons: ReactNode[] = [];
 
     const positions: { row: number; col: number }[] = [];
 
@@ -233,7 +328,7 @@ export function IsometricGrid({
         const y =
             (col + row) * (tileHeightStep / 2);
 
-        tiles.push(
+        groundTiles.push(
             <View
                 key={index}
                 style={{
@@ -246,9 +341,49 @@ export function IsometricGrid({
                     onTilePress?.(index, row, col)
                 }
             >
-                {renderTile(index, row, col)}
+                {renderGround(index, row, col)}
             </View>
         );
+
+        const isDimmed = !!dimIndices?.has(index);
+
+        if (tileOutlineColor || index === highlightIndex || index === flashIndex || isDimmed) {
+            const isHighlight = index === highlightIndex;
+            const isFlash = index === flashIndex;
+            const cx = x + tileWidth / 2;
+            const cy = y + tileHeightStep / 2;
+            const points = `${cx},${y} ${x + tileWidth},${cy} ${cx},${y + tileHeightStep} ${x},${cy}`;
+
+            outlinePolygons.push(
+                <Polygon
+                    key={`outline-${index}`}
+                    points={points}
+                    fill={isFlash ? flashColor : isDimmed ? dimColor : 'none'}
+                    fillOpacity={isFlash ? 0.35 : isDimmed ? 0.4 : 1}
+                    stroke={isHighlight ? highlightColor : isFlash ? flashColor : tileOutlineColor}
+                    strokeWidth={isHighlight || isFlash ? 1.5 : 0.5}
+                    strokeOpacity={isHighlight || isFlash ? 1 : tileOutlineOpacity}
+                />
+            );
+        }
+
+        const decoration = renderDecoration?.(index, row, col);
+
+        if (decoration) {
+            decorationTiles.push(
+                <View
+                    key={index}
+                    style={{
+                        position: 'absolute',
+                        left: x,
+                        top: y,
+                        width: tileWidth,
+                    }}
+                >
+                    {decoration}
+                </View>
+            );
+        }
     }
 
     if (viewportWidth === 0 || viewportHeight === 0) {
@@ -286,7 +421,32 @@ export function IsometricGrid({
                         mapAnimatedStyle,
                     ]}
                 >
-                    {tiles}
+                    {groundTiles}
+                    {outlinePolygons.length > 0 && (
+                        <Svg
+                            width={fullDiamondWidth}
+                            height={fullDiamondHeight}
+                            style={{ position: 'absolute', left: 0, top: 0 }}
+                            pointerEvents="none"
+                        >
+                            {outlinePolygons}
+                        </Svg>
+                    )}
+                    {/* pointerEvents="none" so taps fall through to the ground tile beneath —
+                     * decorations are purely visual here, tap-to-place is handled by the
+                     * ground layer's onTouchEnd above. */}
+                    <View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            left: 0,
+                            top: 0,
+                            width: fullDiamondWidth,
+                            height: fullDiamondHeight,
+                        }}
+                    >
+                        {decorationTiles}
+                    </View>
                 </Animated.View>
             </GestureDetector>
         </View>

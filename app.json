@@ -20,7 +20,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "output": "static",
+      "output": "server",
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
@@ -35,11 +35,11 @@
       ],
       ["expo-font", { "fonts": [
           "./assets/fonts/PlusJakartaSans-Regular.ttf",
-          "./assets/fonts/PlusJakaraSans-Bold.ttf",
-          "./assets/fonts/PlusJakaraSans-Medium.ttf",
-          "./assets/fonts/PlusJakaraSans-SemiBold.ttf",
-          "./assets/fonts/PlusJakaraSans-ExtraBold.ttf",
-          "./assets/fonts/PlusJakaraSans-Light.ttf"
+          "./assets/fonts/PlusJakartaSans-Bold.ttf",
+          "./assets/fonts/PlusJakartaSans-Medium.ttf",
+          "./assets/fonts/PlusJakartaSans-SemiBold.ttf",
+          "./assets/fonts/PlusJakartaSans-ExtraBold.ttf",
+          "./assets/fonts/PlusJakartaSans-Light.ttf"
       ]}]
     ],
     "experiments": {
