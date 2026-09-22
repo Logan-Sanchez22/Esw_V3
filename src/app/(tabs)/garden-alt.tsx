@@ -216,6 +216,36 @@ const GardenAlt = () => {
         return () => clearInterval(id);
     }, [hasSwayableDecoration]);
 
+    // Proactive "these tiles won't work" preview — every tile that would
+    // block the current tool, shown continuously instead of only after a
+    // blocked tap. Decorate mode dims occupied/water/etc. tiles for the
+    // selected item (or empty tiles for the Remove tool); Interact mode
+    // dims invalid destinations once a move is actually in progress. Cheap
+    // to recompute — a scan over 225 tiles of already-pure functions, same
+    // cost class as other per-render tile computations already happening.
+    const dimIndices = useMemo(() => {
+        const set = new Set<number>();
+        if (mode === 'decorate') {
+            if (selectedItemId === REMOVE_TOOL_ID) {
+                state.tiles.forEach((tile, i) => {
+                    if (tile.item === null) set.add(i);
+                });
+            } else {
+                const item = getCatalogItem(selectedItemId);
+                if (item) {
+                    state.tiles.forEach((_, i) => {
+                        if (getPlacementBlock(state, i, item) !== null) set.add(i);
+                    });
+                }
+            }
+        } else if (mode === 'interact' && moveFromIndex !== null) {
+            state.tiles.forEach((_, i) => {
+                if (getMoveBlock(state, moveFromIndex, i) !== null) set.add(i);
+            });
+        }
+        return set;
+    }, [mode, selectedItemId, moveFromIndex, state]);
+
     // Catalog items actually selectable right now — has art on this screen
     // AND matches the active category filter ('all' keeps everything, same
     // list as before categories existed). Split out from pickerItems below
@@ -370,6 +400,7 @@ const GardenAlt = () => {
                         const isBeingMoved = i === moveFromIndex;
                         const isInteractSelected = i === interactSelectedIndex;
                         const isFlash = i === invalidFlashIndex;
+                        const isDimmed = !isFlash && dimIndices.has(i);
                         // Hide the source tile's real item while a move is pending — it
                         // hasn't actually moved in domain state yet, but showing it fully
                         // there AND a ghost at the candidate destination reads as "in two
@@ -476,6 +507,12 @@ const GardenAlt = () => {
                                     <View
                                         pointerEvents="none"
                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.18)' }}
+                                    />
+                                )}
+                                {isDimmed && (
+                                    <View
+                                        pointerEvents="none"
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.4)' }}
                                     />
                                 )}
                                 {isFlash && (

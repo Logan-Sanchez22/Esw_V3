@@ -54,6 +54,13 @@ type Props = {
      * preview outline. */
     flashIndex?: number | null;
     flashColor?: string;
+    /** Tiles to fill with a subtle dimColor tint — a proactive "these won't
+     * work" cue shown continuously (e.g. every occupied/water tile while a
+     * decoration is selected), distinct from flashIndex's brief reactive
+     * flash after an actual blocked tap. A tile in both flashIndex and here
+     * shows the flash, not the dim — flash is the more urgent, momentary signal. */
+    dimIndices?: ReadonlySet<number>;
+    dimColor?: string;
     /** Eases the camera to center on this tile once, when `token` changes —
      * a bump-free way for the parent to request a one-off pan without
      * fighting the gesture-driven translate/scale shared values below.
@@ -94,6 +101,8 @@ export function IsometricGrid({
                                   highlightColor,
                                   flashIndex,
                                   flashColor,
+                                  dimIndices,
+                                  dimColor,
                                   flyTo,
                               }: Props) {
     const [viewport, setViewport] = useState({
@@ -336,7 +345,9 @@ export function IsometricGrid({
             </View>
         );
 
-        if (tileOutlineColor || index === highlightIndex || index === flashIndex) {
+        const isDimmed = !!dimIndices?.has(index);
+
+        if (tileOutlineColor || index === highlightIndex || index === flashIndex || isDimmed) {
             const isHighlight = index === highlightIndex;
             const isFlash = index === flashIndex;
             const cx = x + tileWidth / 2;
@@ -347,8 +358,8 @@ export function IsometricGrid({
                 <Polygon
                     key={`outline-${index}`}
                     points={points}
-                    fill={isFlash ? flashColor : 'none'}
-                    fillOpacity={isFlash ? 0.35 : 1}
+                    fill={isFlash ? flashColor : isDimmed ? dimColor : 'none'}
+                    fillOpacity={isFlash ? 0.35 : isDimmed ? 0.4 : 1}
                     stroke={isHighlight ? highlightColor : isFlash ? flashColor : tileOutlineColor}
                     strokeWidth={isHighlight || isFlash ? 1.5 : 0.5}
                     strokeOpacity={isHighlight || isFlash ? 1 : tileOutlineOpacity}

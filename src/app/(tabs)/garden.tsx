@@ -243,6 +243,36 @@ const Garden = () => {
         return () => clearInterval(id);
     }, [hasSwayableDecoration]);
 
+    // Proactive "these tiles won't work" preview — every tile that would
+    // block the current tool, shown continuously instead of only after a
+    // blocked tap. Decorate mode dims occupied/water/etc. tiles for the
+    // selected item (or empty tiles for the Remove tool); Interact mode
+    // dims invalid destinations once a move is actually in progress. Cheap
+    // to recompute — a scan over 225 tiles of already-pure functions, same
+    // cost class as other per-render tile computations already happening.
+    const dimIndices = useMemo(() => {
+        const set = new Set<number>();
+        if (mode === 'decorate') {
+            if (selectedItemId === REMOVE_TOOL_ID) {
+                state.tiles.forEach((tile, i) => {
+                    if (tile.item === null) set.add(i);
+                });
+            } else {
+                const item = getCatalogItem(selectedItemId);
+                if (item) {
+                    state.tiles.forEach((_, i) => {
+                        if (getPlacementBlock(state, i, item) !== null) set.add(i);
+                    });
+                }
+            }
+        } else if (mode === 'interact' && moveFromIndex !== null) {
+            state.tiles.forEach((_, i) => {
+                if (getMoveBlock(state, moveFromIndex, i) !== null) set.add(i);
+            });
+        }
+        return set;
+    }, [mode, selectedItemId, moveFromIndex, state]);
+
     // Catalog items actually selectable right now — has art on this screen
     // AND matches the active category filter ('all' keeps everything, same
     // list as before categories existed). Split out from pickerItems below
@@ -404,6 +434,8 @@ const Garden = () => {
                     highlightColor={PREVIEW_HIGHLIGHT_COLOR}
                     flashIndex={invalidFlashIndex}
                     flashColor={colors.flash}
+                    dimIndices={dimIndices}
+                    dimColor="#000000"
                     flyTo={flyTo}
                     onTilePress={(index) => {
                         if (mode === 'paint') {
