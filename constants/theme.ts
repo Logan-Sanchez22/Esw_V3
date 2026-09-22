@@ -44,6 +44,32 @@ export const typography = {
     caption: { fontSize: 12, fontFamily: "sans-regular" },
 } as const;
 
+/**
+ * How visible the garden screens' per-tile grid outline is, keyed by the
+ * screen's current mode — same values drive both IsometricGrid's SVG
+ * strokeOpacity and garden-alt.tsx's View borderColor alpha (via withAlpha
+ * below), so the grid recedes by the same amount in both views for the same
+ * mode instead of two independently-tuned numbers. Paint mode keeps it most
+ * visible (you're deciding tile boundaries); Interact mode dims it most
+ * (you're just looking/moving things, the grid should stay out of the way);
+ * Decorate sits in between. Never fully 0 — a preview/flash tile's own
+ * outline always overrides this and stays fully opaque regardless of mode.
+ */
+export const gridOutlineOpacity = {
+    paint: 0.55,
+    decorate: 0.25,
+    interact: 0.12,
+} as const;
+
+/** "#rrggbb" -> "rgba(r,g,b,alpha)" — for a View borderColor, which (unlike
+ * an SVG stroke) has no separate opacity prop of its own. */
+export function withAlpha(hex: string, alpha: number): string {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+}
+
 // One shared "raised card" shadow — used sparingly (stat cards, not every
 // list row) so it stays a signal rather than wallpaper.
 export const shadow = {
@@ -92,4 +118,5 @@ export const theme = {
     components,
     typography,
     shadow,
+    gridOutlineOpacity,
 } as const;

@@ -39,6 +39,13 @@ type Props = {
      * drawing tile outlines.
      */
     tileOutlineColor?: string;
+    /** Opacity applied to the base per-tile outline ONLY — a highlighted or
+     * flashed tile's own outline always stays fully opaque regardless of this,
+     * since that's functional feedback, not ambient grid. Lets the parent dim
+     * the grid by mode (see constants/theme.ts's gridOutlineOpacity) so the
+     * garden reads as calmer to look at than to edit. Defaults to 1 (fully
+     * visible) if omitted, matching this component's original behavior. */
+    tileOutlineOpacity?: number;
     /** Index of one tile to outline with highlightColor instead (e.g. a placement preview). */
     highlightIndex?: number | null;
     highlightColor?: string;
@@ -82,6 +89,7 @@ export function IsometricGrid({
                                   renderDecoration,
                                   onTilePress,
                                   tileOutlineColor,
+                                  tileOutlineOpacity = 1,
                                   highlightIndex,
                                   highlightColor,
                                   flashIndex,
@@ -343,6 +351,7 @@ export function IsometricGrid({
                     fillOpacity={isFlash ? 0.35 : 1}
                     stroke={isHighlight ? highlightColor : isFlash ? flashColor : tileOutlineColor}
                     strokeWidth={isHighlight || isFlash ? 1.5 : 0.5}
+                    strokeOpacity={isHighlight || isFlash ? 1 : tileOutlineOpacity}
                 />
             );
         }

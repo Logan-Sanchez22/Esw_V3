@@ -15,11 +15,13 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
-import { StatPill } from '@/components/ui';
+import { ScreenHeader, StatPill } from '@/components/ui';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import {
     CATALOG,
+    CATALOG_CATEGORIES,
+    CatalogCategory,
     DEFAULT_CATALOG_ITEM_ID,
     GRID_SIZE,
     GROUND_CATALOG,
@@ -28,16 +30,17 @@ import {
     getMoveBlock,
     getPlacementBlock,
     isItemUnlocked,
+    pickFallbackSelection,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
-import { colors } from '../../../constants/theme';
+import { colors, gridOutlineOpacity, withAlpha } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
 const TILE_SIZE = 48;
 const PICKER_ICON_SIZE = 32;
-const HEADER_HEIGHT = 250; // title + points + mode toggle + picker + safe area
+const HEADER_HEIGHT = 300; // title (ScreenHeader) + points + mode toggle + category filter + picker + safe area
 
 type Mode = 'decorate' | 'paint' | 'interact';
 
@@ -45,6 +48,15 @@ const MODE_OPTIONS = [
     { id: 'decorate' as const, label: '🌳 Decorate' },
     { id: 'paint' as const, label: '🎨 Ground' },
     { id: 'interact' as const, label: '👆 Interact' },
+];
+
+// 'all' plus every real category, in CATALOG_CATEGORIES' canonical order —
+// the decoration picker's filter row. Reuses ModeToggle itself (not just its
+// visual pattern) since a pill-row single-select is exactly what this is.
+type CategoryFilter = 'all' | CatalogCategory;
+const CATEGORY_FILTER_OPTIONS = [
+    { id: 'all' as const, label: 'All' },
+    ...CATALOG_CATEGORIES.map((category) => ({ id: category.id, label: category.label })),
 ];
 
 // Top-down ground atlas only has grass/dirt/water — no stone-path equivalent,
@@ -77,6 +89,7 @@ const GardenAlt = () => {
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
+    const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
     const { message, showMessage } = useStatusMessage();
     const insets = useSafeAreaInsets();
     const bottomNavSpace = 100 + insets.bottom;
@@ -152,13 +165,42 @@ const GardenAlt = () => {
         return () => clearInterval(id);
     }, [hasWater]);
 
+    // Catalog items actually selectable right now — has art on this screen
+    // AND matches the active category filter ('all' keeps everything, same
+    // list as before categories existed). Split out from pickerItems below
+    // so the fallback-selection effect can see it without also depending on
+    // point-earned-driven lock state.
+    const visibleCatalogItems = useMemo(
+        () =>
+            CATALOG.filter(
+                (item) =>
+                    getDecorationSprite(item.id, 'topDown') &&
+                    (categoryFilter === 'all' || item.category === categoryFilter)
+            ),
+        [categoryFilter]
+    );
+
+    // A category change can hide the currently-selected item entirely — if
+    // it does, reassign to something actually visible rather than leaving
+    // the picker showing no highlighted item while a tap would still place
+    // the now-invisible old selection. Remove is never hidden by a filter,
+    // so it never needs reassigning.
+    useEffect(() => {
+        if (selectedItemId === REMOVE_TOOL_ID) return;
+        if (visibleCatalogItems.some((item) => item.id === selectedItemId)) return;
+        setSelectedItemId(pickFallbackSelection(state, visibleCatalogItems));
+        // Only react to the filtered set changing (i.e. categoryFilter) — not
+        // to state/selectedItemId, which would re-fire this on every point earned.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleCatalogItems]);
+
     // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
     // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
     // lifetime earnings actually change, not on every render.
     const pickerItems: PickerEntry[] = useMemo(
         () => [
             { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-            ...CATALOG.filter((item) => getDecorationSprite(item.id, 'topDown')).map((item) => {
+            ...visibleCatalogItems.map((item) => {
                 const deco = getDecorationSprite(item.id, 'topDown')!;
                 const locked = !isItemUnlocked(state, item);
                 return {
@@ -171,14 +213,14 @@ const GardenAlt = () => {
                 };
             }),
         ],
-        [state.totalPointsEarned]
+        [visibleCatalogItems, state.totalPointsEarned]
     );
 
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
-                <Text className="text-xl font-bold text-success mb-2">TopDown Garden</Text>
-                <View style={{ flexDirection: 'row', gap: 8 }}>
+                <ScreenHeader title="Top-Down Garden" />
+                <View style={{ flexDirection: 'row', gap: 8, marginTop: -8 }}>
                     <StatPill label="points" value={state.points} />
                     <StatPill label="earned" value={state.totalPointsEarned} />
                 </View>
@@ -188,12 +230,20 @@ const GardenAlt = () => {
             <ModeToggle options={MODE_OPTIONS} selected={mode} onSelect={setMode} />
 
             {mode === 'decorate' ? (
-                <ItemPicker
-                    items={pickerItems}
-                    selectedId={selectedItemId}
-                    onSelect={setSelectedItemId}
-                    points={state.points}
-                />
+                <>
+                    <ModeToggle
+                        options={CATEGORY_FILTER_OPTIONS}
+                        selected={categoryFilter}
+                        onSelect={setCategoryFilter}
+                        activeColor={colors.highlight}
+                    />
+                    <ItemPicker
+                        items={pickerItems}
+                        selectedId={selectedItemId}
+                        onSelect={setSelectedItemId}
+                        points={state.points}
+                    />
+                </>
             ) : mode === 'paint' ? (
                 <ItemPicker
                     items={GROUND_PICKER_ITEMS}
@@ -247,7 +297,11 @@ const GardenAlt = () => {
                                     width: TILE_SIZE,
                                     height: TILE_SIZE,
                                     borderWidth: isHighlighted || isFlash ? 2 : 1,
-                                    borderColor: isFlash ? colors.flash : isHighlighted ? colors.highlight : colors.tileOutline,
+                                    borderColor: isFlash
+                                        ? colors.flash
+                                        : isHighlighted
+                                          ? colors.highlight
+                                          : withAlpha(colors.tileOutline, gridOutlineOpacity[mode]),
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',

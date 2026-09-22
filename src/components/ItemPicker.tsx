@@ -64,7 +64,12 @@ function PickerItemButton({
                     borderRadius: 10,
                     borderWidth: selected ? 2 : 1,
                     borderColor: selected ? colors.highlight : 'rgba(255,255,255,0.15)',
-                    backgroundColor: 'rgba(0,0,0,0.25)',
+                    // A selected card also gets a faint tint of the same
+                    // highlight color, not just a thicker border — the border
+                    // alone reads as one thin line's worth of difference at a
+                    // glance; the tint makes "this is the one that's active"
+                    // legible without having to look closely at the edge.
+                    backgroundColor: selected ? 'rgba(250,204,21,0.12)' : 'rgba(0,0,0,0.25)',
                     opacity: locked ? 0.5 : affordable ? 1 : 0.4,
                     paddingVertical: 8,
                 }}
@@ -78,7 +83,7 @@ function PickerItemButton({
                         🔒 {item.lockedHint ?? 'Locked'}
                     </Text>
                 ) : (
-                    <Text style={{ fontSize: 10, color: '#facc15', marginTop: 2 }}>
+                    <Text style={{ fontSize: 10, color: colors.highlight, marginTop: 2 }}>
                         {item.cost > 0 ? `${item.cost} pts` : 'Free'}
                     </Text>
                 )}

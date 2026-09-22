@@ -11,10 +11,22 @@ export type TileState = {
   item: PlacedItemId;
 };
 
+/**
+ * Groups CATALOG for browsing — chosen to fit what's actually in the catalog
+ * today (see the assignments below), not a generic taxonomy: trees for the
+ * two tree items, plants for things you'd deliberately grow (bushes, flowers,
+ * grass, a lily pad), nature for found/natural objects that aren't quite
+ * "planted" (rock, log, mushroom), structures for the one man-made item.
+ */
+export type CatalogCategory = 'trees' | 'plants' | 'nature' | 'structures';
+
 export type CatalogItem = {
   id: string;
   label: string;
   cost: number;
+  /** Required, not optional — every item needs to be findable by category,
+   * so a future addition can't silently ship without one. */
+  category: CatalogCategory;
   /**
    * How big this should render relative to a full tile (1 = fills the tile
    * like a tree does). Every decoration used to render at a flat tile-sized
@@ -163,26 +175,35 @@ export const CATALOG: CatalogItem[] = [
   // each) — 20 is reachable after a couple of modest quests (an early
   // motivator), 50 takes most of them (a capstone reward for the priciest
   // item). Everything else stays unlocked from the start.
-  { id: 'tree', label: 'Tree', cost: 12, visualScale: 1, unlockThreshold: 20 },
-  { id: 'treeBare', label: 'Bare Tree', cost: 8, visualScale: 0.9 },
-  { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55 },
-  { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55 },
-  { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35 },
-  { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3 },
-  { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5 },
-  { id: 'log', label: 'Log', cost: 3, visualScale: 0.5 },
-  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50 },
+  { id: 'tree', label: 'Tree', cost: 12, visualScale: 1, unlockThreshold: 20, category: 'trees' },
+  { id: 'treeBare', label: 'Bare Tree', cost: 8, visualScale: 0.9, category: 'trees' },
+  { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55, category: 'plants' },
+  { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55, category: 'plants' },
+  { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
+  { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, category: 'nature' },
+  { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
+  { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },
+  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures' },
   // Top-down only for now — no honest iso counterpart in the 41 sprites
   // extracted from misc.png so far (lily pads/grass tufts aren't part of
   // that sheet's subject matter). Same asymmetry the iso side already has
   // in the other direction (bench, most flower colors).
-  { id: 'lilyPad', label: 'Lily Pad', cost: 2, visualScale: 0.4 },
-  { id: 'grassTuft', label: 'Grass Tuft', cost: 1, visualScale: 0.3 },
+  { id: 'lilyPad', label: 'Lily Pad', cost: 2, visualScale: 0.4, category: 'plants' },
+  { id: 'grassTuft', label: 'Grass Tuft', cost: 1, visualScale: 0.3, category: 'plants' },
 ];
 
 export function getCatalogItem(id: string): CatalogItem | undefined {
   return CATALOG.find((item) => item.id === id);
 }
+
+/** Canonical order + display label for the category filter row — the one
+ * place that list is defined, so the picker UI never hardcodes it again. */
+export const CATALOG_CATEGORIES: { id: CatalogCategory; label: string }[] = [
+  { id: 'trees', label: 'Trees' },
+  { id: 'plants', label: 'Plants' },
+  { id: 'nature', label: 'Nature' },
+  { id: 'structures', label: 'Structures' },
+];
 
 /** First always-unlocked item — a sensible default picker selection for a
  * fresh player, since CATALOG[0] itself now carries an unlockThreshold. */
@@ -191,6 +212,21 @@ export const DEFAULT_CATALOG_ITEM_ID: string =
 
 /** Sentinel picker selection id for the "clear this tile" tool — not a real catalog item. */
 export const REMOVE_TOOL_ID = '__remove__';
+
+/**
+ * What the picker's selection should fall back to when a category filter
+ * hides the item that was selected — e.g. selecting "Trees" while a Bench
+ * was selected. Prefers the first unlocked item in the still-visible set
+ * (mirrors DEFAULT_CATALOG_ITEM_ID's own rule of never defaulting to
+ * something the player can't yet place); falls back to the first visible
+ * item regardless of lock state, or the Remove tool if the filtered set is
+ * empty (can't happen with today's catalog, but every category should stay
+ * non-empty by construction — this is just the safe floor).
+ */
+export function pickFallbackSelection(state: GardenDomainState, visibleItems: CatalogItem[]): string {
+  const firstUnlocked = visibleItems.find((item) => isItemUnlocked(state, item));
+  return firstUnlocked?.id ?? visibleItems[0]?.id ?? REMOVE_TOOL_ID;
+}
 
 export type GroundOption = {
   id: string;
