@@ -114,6 +114,14 @@ function getGroundSpriteKey(groundId: string, tileIndex: number, waterTick: numb
     return GROUND_SPRITE[groundId] ?? 'grassFlat';
 }
 
+// One full back-and-forth cycle, in degrees — offset per tile index (added
+// to the tick before indexing) so a garden full of trees doesn't sway in
+// unison like it's one object.
+const SWAY_STEPS_DEG = [-2, -1, 0, 1, 2, 1, 0, -1] as const;
+function getSwayDegrees(tileIndex: number, tick: number): number {
+    return SWAY_STEPS_DEG[(tileIndex + tick) % SWAY_STEPS_DEG.length];
+}
+
 const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
     id: ground.id,
     label: ground.label,
@@ -206,6 +214,33 @@ const Garden = () => {
         const id = setInterval(() => setWaterTick((t) => t + 1), 1200);
         return () => clearInterval(id);
     }, [hasWater]);
+
+    // Gentle idle sway on trees/plants — a discrete step-cycle driven by
+    // plain interval state, the same proven-safe mechanism as the water
+    // ripple above, not a continuous Reanimated transform. This screen's
+    // decorations render nested inside the pan/zoom gesture's own
+    // Reanimated-driven transform, and this session already hit one real
+    // bug from a *different* kind of Reanimated animation (layout
+    // entering/exiting) misbehaving in exactly that nesting — a continuous
+    // transform nested this deep has never actually been confirmed safe
+    // on-device, so this sidesteps that open question rather than shipping
+    // an unverified guess. A smoother Reanimated-driven sway is a
+    // reasonable future upgrade once it can be checked on a device.
+    const hasSwayableDecoration = useMemo(
+        () =>
+            state.tiles.some((tile) => {
+                if (!tile.item) return false;
+                const item = getCatalogItem(tile.item);
+                return item?.category === 'trees' || item?.category === 'plants';
+            }),
+        [state.tiles]
+    );
+    const [swayTick, setSwayTick] = useState(0);
+    useEffect(() => {
+        if (!hasSwayableDecoration) return;
+        const id = setInterval(() => setSwayTick((t) => t + 1), 900);
+        return () => clearInterval(id);
+    }, [hasSwayableDecoration]);
 
     // Catalog items actually selectable right now — has art on this screen
     // AND matches the active category filter ('all' keeps everything, same
@@ -414,6 +449,13 @@ const Garden = () => {
                         const sprite = getDecorationSprite(itemId, 'isometric');
                         const catalogItem = getCatalogItem(itemId);
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
+                        // Only real, already-settled trees/plants sway — never a ghost
+                        // preview (still being positioned, should stay predictable) and
+                        // never a rock/log/bench/mushroom (rigid objects don't sway).
+                        const swayDeg =
+                            !isGhost && (catalogItem?.category === 'trees' || catalogItem?.category === 'plants')
+                                ? getSwayDegrees(index, swayTick)
+                                : 0;
 
                         return (
                             <View style={isGhost ? { opacity: 0.55 } : undefined}>
@@ -438,17 +480,23 @@ const Garden = () => {
                                     }}
                                 >
                                     <DecorationShadow size={decorationSize} />
-                                    {sprite ? (
-                                        <AtlasSprite
-                                            atlas={sprite.atlas}
-                                            sprite={sprite.key}
-                                            size={decorationSize}
-                                        />
-                                    ) : (
-                                        // Placed via the other screen with no iso art yet
-                                        // (e.g. lilyPad, grassTuft) — see UnknownItemMarker.
-                                        <UnknownItemMarker size={decorationSize} />
-                                    )}
+                                    {/* Sway rotates only the sprite, pivoted at its own base
+                                     (transformOrigin bottom-center) so it reads as bending
+                                     from its root rather than tipping over — the shadow stays
+                                     put, matching how a real shadow wouldn't rotate with it. */}
+                                    <View style={{ transform: [{ rotate: `${swayDeg}deg` }], transformOrigin: '50% 100%' }}>
+                                        {sprite ? (
+                                            <AtlasSprite
+                                                atlas={sprite.atlas}
+                                                sprite={sprite.key}
+                                                size={decorationSize}
+                                            />
+                                        ) : (
+                                            // Placed via the other screen with no iso art yet
+                                            // (e.g. lilyPad, grassTuft) — see UnknownItemMarker.
+                                            <UnknownItemMarker size={decorationSize} />
+                                        )}
+                                    </View>
                                 </View>
                             </View>
                         );
