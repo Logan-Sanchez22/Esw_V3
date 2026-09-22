@@ -3,30 +3,48 @@ import React, { useState } from 'react'
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/expo";
+import Slider from '@react-native-community/slider';
 
 import { Button, ScreenHeader, SectionHeading, StatPill } from '@/components/ui';
 import { ModeToggle } from '@/components/ModeToggle';
 import { completedTodayCount, QUESTS } from '@/lib/quest-domain';
-import { isSoundEnabled, setSoundEnabled } from '@/lib/sound';
+import { getVolume, isMusicEnabled, isSoundEnabled, setMusicEnabled, setSoundEnabled, setVolume } from '@/lib/sound';
 import { useQuestDomain } from '@/context/quest-domain-store';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
-const SOUND_OPTIONS = [
+const ON_OFF_OPTIONS = [
     { id: 'on' as const, label: 'On' },
     { id: 'off' as const, label: 'Off' },
 ];
+
+function PreferenceLabel({ children }: { children: React.ReactNode }) {
+    return (
+        <Text
+            style={{
+                color: colors.foreground,
+                fontSize: typography.label.fontSize,
+                fontFamily: typography.label.fontFamily,
+                marginBottom: 4,
+            }}
+        >
+            {children}
+        </Text>
+    );
+}
 
 const Settings = () => {
     const { state: gardenState, resetGarden } = useGardenDomain();
     const { state: questState, resetQuests } = useQuestDomain();
     const { signOut } = useAuth();
     const { user } = useUser();
-    // Mirrors sound.ts's module-level flag in local state purely so this
-    // toggle re-renders — isSoundEnabled() itself isn't reactive.
+    // Mirrors sound.ts's module-level flags/value in local state purely so
+    // these controls re-render — the getters below aren't reactive on their own.
     const [soundOn, setSoundOn] = useState(isSoundEnabled());
+    const [musicOn, setMusicOn] = useState(isMusicEnabled());
+    const [volume, setVolumeState] = useState(getVolume());
 
     const confirmReset = (title: string, message: string, onConfirm: () => void) => {
         Alert.alert(title, message, [
@@ -82,8 +100,10 @@ const Settings = () => {
                 </Text>
 
                 <SectionHeading title="Preferences" />
+
+                <PreferenceLabel>Sound Effects</PreferenceLabel>
                 <ModeToggle
-                    options={SOUND_OPTIONS}
+                    options={ON_OFF_OPTIONS}
                     selected={soundOn ? 'on' : 'off'}
                     onSelect={(id) => {
                         setSoundOn(id === 'on');
@@ -96,11 +116,48 @@ const Settings = () => {
                         fontSize: typography.caption.fontSize,
                         fontFamily: typography.caption.fontFamily,
                         marginTop: -spacing[1],
-                        marginBottom: spacing[3],
+                        marginBottom: spacing[4],
                     }}
                 >
                     Plays a short sound when you place, remove, or complete a quest.
                 </Text>
+
+                <PreferenceLabel>Music</PreferenceLabel>
+                <ModeToggle
+                    options={ON_OFF_OPTIONS}
+                    selected={musicOn ? 'on' : 'off'}
+                    onSelect={(id) => {
+                        setMusicOn(id === 'on');
+                        setMusicEnabled(id === 'on');
+                    }}
+                />
+                <Text
+                    style={{
+                        color: colors.mutedForeground,
+                        fontSize: typography.caption.fontSize,
+                        fontFamily: typography.caption.fontFamily,
+                        marginTop: -spacing[1],
+                        marginBottom: spacing[4],
+                    }}
+                >
+                    A gentle ambient loop while you play.
+                </Text>
+
+                <PreferenceLabel>Volume — {Math.round(volume * 100)}%</PreferenceLabel>
+                <Slider
+                    style={{ marginHorizontal: 12, marginBottom: spacing[3] }}
+                    minimumValue={0}
+                    maximumValue={1}
+                    step={0.05}
+                    value={volume}
+                    minimumTrackTintColor={colors.primary}
+                    maximumTrackTintColor={colors.border}
+                    thumbTintColor={colors.primary}
+                    onValueChange={(v) => {
+                        setVolumeState(v);
+                        setVolume(v);
+                    }}
+                />
 
                 <SectionHeading title="Danger Zone" />
                 <View style={{ gap: spacing[3] }}>
