@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createAudioPlayer, type AudioPlayer } from 'expo-audio';
+import { createAudioPlayer, setAudioModeAsync, type AudioPlayer } from 'expo-audio';
 
 /**
  * Short one-shot sound effects (placement, removal, quest completion) —
@@ -29,13 +29,32 @@ export function isSoundEnabled(): boolean {
     return soundEnabled;
 }
 
-/** Call once near app startup (see settings.tsx) to restore the saved preference. */
+/**
+ * Call once near app startup (see src/app/_layout.tsx) to restore the saved
+ * preference and configure the native audio session.
+ *
+ * expo-audio's own TS docs claim `playsInSilentMode` defaults to `true`, but
+ * the installed native default on iOS (ios/AudioRecords.swift) is actually
+ * `false` until `setAudioModeAsync` is called at least once — without this,
+ * every effect gets silently muted by the audio session whenever the
+ * device's silent switch is on (Android's native default is already `true`,
+ * matching the docs). `interruptionMode: 'mixWithOthers'` matches what's
+ * actually wanted for short SFX (also already the library default, set
+ * explicitly here since we're touching this call anyway).
+ */
 export async function loadSoundPreference(): Promise<void> {
     try {
         const raw = await AsyncStorage.getItem(SOUND_ENABLED_STORAGE_KEY);
         if (raw !== null) soundEnabled = raw === 'true';
     } catch {
         // Corrupt or unavailable storage — keep the default (enabled).
+    }
+
+    try {
+        await setAudioModeAsync({ playsInSilentMode: true, interruptionMode: 'mixWithOthers' });
+    } catch (error) {
+        // Best-effort — worst case effects stay silenced by the silent switch.
+        if (__DEV__) console.warn('[sound] setAudioModeAsync failed:', error);
     }
 }
 
@@ -59,9 +78,10 @@ function getPlayer(effect: SoundEffect): AudioPlayer | null {
             players[effect] = player;
         }
         return player;
-    } catch {
+    } catch (error) {
         // Player creation can fail if the audio subsystem isn't available on
         // this platform/build — fall back to no sound rather than throwing.
+        if (__DEV__) console.warn(`[sound] createAudioPlayer('${effect}') failed:`, error);
         return null;
     }
 }
@@ -72,15 +92,22 @@ export function playSound(effect: SoundEffect): void {
     const player = getPlayer(effect);
     if (!player) return;
 
-    (async () => {
-        try {
-            // Rewind first so rapid repeated taps (e.g. quickly placing
-            // several items) replay from the start instead of doing nothing
-            // once a previous play of the same short clip has finished.
-            await player.seekTo(0);
-            player.play();
-        } catch {
-            // Best-effort — never let a sound failure interrupt gameplay.
+    try {
+        // `.play()` unconditionally and synchronously, matching expo-audio's
+        // own documented usage (calling it immediately after creation, with
+        // no seek). An earlier version awaited `player.seekTo(0)` before
+        // play() — if the player hadn't finished loading yet, that seek
+        // could reject before play() ever ran, and the try/catch around it
+        // would swallow the rejection, silently skipping the sound entirely.
+        player.play();
+        // Best-effort rewind for a replay (once a previous play of this same
+        // short clip has already finished) — fired without blocking play()
+        // above, so a still-loading player never has its first play skipped.
+        if (player.currentTime > 0) {
+            player.seekTo(0).catch(() => {});
         }
-    })();
+    } catch (error) {
+        // Best-effort — never let a sound failure interrupt gameplay.
+        if (__DEV__) console.warn(`[sound] play('${effect}') failed:`, error);
+    }
 }
