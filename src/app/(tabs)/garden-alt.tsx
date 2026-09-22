@@ -1,12 +1,14 @@
 import { View, Text, TouchableOpacity } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import {
     SafeAreaView as RNSafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { AtlasSprite } from '@/components/AtlasSprite';
+import { DecorationShadow } from '@/components/DecorationShadow';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
@@ -94,6 +96,20 @@ const GardenAlt = () => {
         setPreviewIndex(null);
     }, [selectedItemId, mode]);
 
+    // Brief red flash on a tile that was just tapped but blocked — same
+    // pattern as useStatusMessage's timeout, but keyed to a tile index
+    // instead of text, so it can render as a fill on that one tile.
+    const [invalidFlashIndex, setInvalidFlashIndex] = useState<number | null>(null);
+    const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const flashInvalid = (index: number) => {
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        setInvalidFlashIndex(index);
+        flashTimer.current = setTimeout(() => setInvalidFlashIndex(null), 400);
+    };
+    useEffect(() => () => {
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+    }, []);
+
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
@@ -128,6 +144,7 @@ const GardenAlt = () => {
                     renderTile={(i) => {
                         const tile = state.tiles[i];
                         const isPreview = i === previewIndex;
+                        const isFlash = i === invalidFlashIndex;
                         const itemId = isPreview ? selectedItemId : tile.item;
                         const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
                         const groundKey = GROUND_SPRITE[tile.ground] ?? 'grass';
@@ -138,8 +155,8 @@ const GardenAlt = () => {
                                 style={{
                                     width: TILE_SIZE,
                                     height: TILE_SIZE,
-                                    borderWidth: isPreview ? 2 : 1,
-                                    borderColor: isPreview ? '#facc15' : '#4A3728',
+                                    borderWidth: isPreview || isFlash ? 2 : 1,
+                                    borderColor: isFlash ? '#ef4444' : isPreview ? '#facc15' : '#4A3728',
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',
@@ -160,15 +177,31 @@ const GardenAlt = () => {
                                     if (!item) return;
 
                                     const block = getPlacementBlock(state, i, item);
-                                    if (block === 'occupied') showMessage('Tile already has something — remove it first');
-                                    else if (block === 'non-placeable-terrain') showMessage("Can't place on water");
-                                    else if (block === 'insufficient-points') showMessage('Not enough points');
-                                    else setPreviewIndex(i);
+                                    if (block === 'occupied') {
+                                        showMessage('Tile already has something — remove it first');
+                                        flashInvalid(i);
+                                    } else if (block === 'non-placeable-terrain') {
+                                        showMessage("Can't place on water");
+                                        flashInvalid(i);
+                                    } else if (block === 'insufficient-points') {
+                                        showMessage('Not enough points');
+                                        flashInvalid(i);
+                                    } else {
+                                        setPreviewIndex(i);
+                                    }
                                 }}
                             >
                                 <AtlasSprite atlas={topDownGroundAtlas} sprite={groundKey} size={TILE_SIZE} fit="stretch" />
-                                {itemId && (
+                                {isFlash && (
                                     <View
+                                        pointerEvents="none"
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(239,68,68,0.35)' }}
+                                    />
+                                )}
+                                {itemId && (
+                                    <Animated.View
+                                        entering={ZoomIn.duration(180)}
+                                        exiting={FadeOut.duration(150)}
                                         style={{
                                             position: 'absolute',
                                             bottom: 0,
@@ -176,6 +209,7 @@ const GardenAlt = () => {
                                             opacity: isPreview ? 0.55 : 1,
                                         }}
                                     >
+                                        <DecorationShadow size={decorationSize} />
                                         {deco ? (
                                             <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={decorationSize} />
                                         ) : (
@@ -183,7 +217,7 @@ const GardenAlt = () => {
                                             // (e.g. bench) — see UnknownItemMarker.
                                             <UnknownItemMarker size={decorationSize} />
                                         )}
-                                    </View>
+                                    </Animated.View>
                                 )}
                             </TouchableOpacity>
                         );

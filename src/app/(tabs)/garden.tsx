@@ -1,20 +1,23 @@
 import { View, Text } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import { Link } from "expo-router";
 import {
     SafeAreaView as RNSafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
+import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { AtlasSprite } from '@/components/AtlasSprite';
+import { DecorationShadow } from '@/components/DecorationShadow';
 import { IsometricGrid } from '@/components/IsometricGrid';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
-import { isoBlocksAtlas } from '@/lib/atlases/iso-blocks-atlas';
+import { isoBlocksAtlas, IsoBlockKey } from '@/lib/atlases/iso-blocks-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
+import { pickVariant } from '@/lib/variantPick';
 import {
     CATALOG,
     GRID_SIZE,
@@ -56,13 +59,36 @@ const MODE_OPTIONS = [
 ];
 
 // All 47 iso ground tiles exist in the atlas — these four are the curated
-// selection exposed as paintable ground types (see GROUND_CATALOG).
+// selection exposed as paintable ground types (see GROUND_CATALOG). This is
+// also each type's picker-icon and fallback sprite — actual placed tiles use
+// getGroundSpriteKey below for grass/dirt, which vary per-tile.
 const GROUND_SPRITE: Record<string, keyof typeof isoBlocksAtlas.sprites> = {
     grass: 'grassFlat',
     dirt: 'soilPlain1',
     water: 'waterPlain',
     stonePath: 'stonePathPlain1',
 };
+
+// A few flat, plain variants per type (checked against the actual sprite
+// sheet — not every "grass"-ish or "soil"-ish sprite qualifies: sparkle/moss/
+// speckle sprites with visible extra detail were left out where they'd read
+// as clutter rather than a subtle natural variation). Repeating an entry
+// weights it higher — grassFlat/soilPlain1 stay the common case.
+const GRASS_VARIANTS: readonly IsoBlockKey[] = ['grassFlat', 'grassFlat', 'grassPlain2', 'grassSparkle1'];
+const DIRT_VARIANTS: readonly IsoBlockKey[] = ['soilPlain1', 'soilPlain1', 'soilPlain2', 'soilSpeckled1'];
+const GROUND_VARIANTS: Partial<Record<string, readonly IsoBlockKey[]>> = {
+    grass: GRASS_VARIANTS,
+    dirt: DIRT_VARIANTS,
+};
+
+// Deterministic per-tile pick (same tile always renders the same variant,
+// no new persisted field needed) — water/stonePath have no variant list, so
+// they always fall through to their single GROUND_SPRITE entry.
+function getGroundSpriteKey(groundId: string, tileIndex: number): keyof typeof isoBlocksAtlas.sprites {
+    const variants = GROUND_VARIANTS[groundId];
+    if (variants) return pickVariant(tileIndex, variants);
+    return GROUND_SPRITE[groundId] ?? 'grassFlat';
+}
 
 // Not every catalog entry has iso art (lilyPad/grassTuft are top-down only) —
 // filter to what has an isometric sprite in the shared registry. Plus a
@@ -113,6 +139,20 @@ const Garden = () => {
         setPreviewIndex(null);
     }, [selectedItemId, mode]);
 
+    // Brief red flash on a tile that was just tapped but blocked — same
+    // pattern as useStatusMessage's timeout, but keyed to a tile index
+    // instead of text, so it can render as a fill on that one tile.
+    const [invalidFlashIndex, setInvalidFlashIndex] = useState<number | null>(null);
+    const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const flashInvalid = (index: number) => {
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        setInvalidFlashIndex(index);
+        flashTimer.current = setTimeout(() => setInvalidFlashIndex(null), 400);
+    };
+    useEffect(() => () => {
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+    }, []);
+
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
@@ -157,6 +197,8 @@ const Garden = () => {
                     tileOutlineColor={TILE_OUTLINE_COLOR}
                     highlightIndex={previewIndex}
                     highlightColor={PREVIEW_HIGHLIGHT_COLOR}
+                    flashIndex={invalidFlashIndex}
+                    flashColor="#ef4444"
                     onTilePress={(index) => {
                         if (mode === 'paint') {
                             paintGround(index, selectedGroundId);
@@ -173,15 +215,23 @@ const Garden = () => {
                         if (!item) return;
 
                         const block = getPlacementBlock(state, index, item);
-                        if (block === 'occupied') showMessage('Tile already has something — remove it first');
-                        else if (block === 'non-placeable-terrain') showMessage("Can't place on water");
-                        else if (block === 'insufficient-points') showMessage('Not enough points');
-                        else setPreviewIndex(index);
+                        if (block === 'occupied') {
+                            showMessage('Tile already has something — remove it first');
+                            flashInvalid(index);
+                        } else if (block === 'non-placeable-terrain') {
+                            showMessage("Can't place on water");
+                            flashInvalid(index);
+                        } else if (block === 'insufficient-points') {
+                            showMessage('Not enough points');
+                            flashInvalid(index);
+                        } else {
+                            setPreviewIndex(index);
+                        }
                     }}
                     renderGround={(index) => (
                         <AtlasSprite
                             atlas={isoBlocksAtlas}
-                            sprite={GROUND_SPRITE[state.tiles[index].ground] ?? 'grassFlat'}
+                            sprite={getGroundSpriteKey(state.tiles[index].ground, index)}
                             size={TILE_WIDTH}
                         />
                     )}
@@ -196,14 +246,19 @@ const Garden = () => {
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
 
                         return (
-                            <View style={isPreview ? { opacity: 0.55 } : undefined}>
+                            <Animated.View
+                                entering={ZoomIn.duration(180)}
+                                exiting={FadeOut.duration(150)}
+                                style={isPreview ? { opacity: 0.55 } : undefined}
+                            >
                                 {/* Invisible — exists only so this decoration's height/anchor
-                                 math matches this tile's own ground sprite's, without
+                                 math matches this tile's own ground sprite's (same variant,
+                                 since variants can differ slightly in native size), without
                                  duplicating the sprite sizing logic. Drawing is handled by
                                  the ground pass. */}
                                 <AtlasSprite
                                     atlas={isoBlocksAtlas}
-                                    sprite={GROUND_SPRITE[tile.ground] ?? 'grassFlat'}
+                                    sprite={getGroundSpriteKey(tile.ground, index)}
                                     size={TILE_WIDTH}
                                     style={{ opacity: 0 }}
                                 />
@@ -215,6 +270,7 @@ const Garden = () => {
                                         alignSelf: 'center',
                                     }}
                                 >
+                                    <DecorationShadow size={decorationSize} />
                                     {sprite ? (
                                         <AtlasSprite
                                             atlas={sprite.atlas}
@@ -227,7 +283,7 @@ const Garden = () => {
                                         <UnknownItemMarker size={decorationSize} />
                                     )}
                                 </View>
-                            </View>
+                            </Animated.View>
                         );
                     }}
                 />

@@ -26,21 +26,25 @@ type Props = {
     renderDecoration?: (index: number, row: number, col: number) => ReactNode | null | undefined;
     onTilePress?: (index: number, row: number, col: number) => void;
     /**
-     * Outline color drawn on every tile's diamond edge — traces the LOGICAL
-     * grid cell (tileWidth x tileHeightStep, the same step used to position
-     * tiles above), not the ground sprite's own drawn pixel bounds. This tile
-     * set's sprites draw each tile as a pseudo-3D block (flat top + shaded
-     * sides) whose top face is intentionally taller than tileHeightStep, so
-     * adjacent tiles' art overlaps slightly for a seamless floor — outlining
-     * that raw sprite height instead of the grid step makes neighboring
-     * outlines overlap too, which shows up as double/crossing lines (this
-     * was a real bug here once; verified by simulating both against a
-     * multi-tile grid before fixing). Omit to skip drawing tile outlines.
+     * Outline color drawn on every tile's diamond edge — a diamond of
+     * tileWidth x tileHeightStep, positioned identically to the ground tile
+     * (see the position math below). tileHeightStep must equal this tile
+     * set's real top-face height for the outline to trace the sprite's own
+     * edge exactly (it does — pixel-measured; see the constant's definition
+     * in garden.tsx). Getting this wrong once made neighboring outlines
+     * overlap, visible as double/crossing lines — verified by simulating
+     * both values against a multi-tile grid before fixing. Omit to skip
+     * drawing tile outlines.
      */
     tileOutlineColor?: string;
     /** Index of one tile to outline with highlightColor instead (e.g. a placement preview). */
     highlightIndex?: number | null;
     highlightColor?: string;
+    /** Index of one tile to fill (not just outline) with flashColor — a brief
+     * "you can't place here" cue, distinct from highlightIndex's persistent
+     * preview outline. */
+    flashIndex?: number | null;
+    flashColor?: string;
 };
 
 function clampAxis(
@@ -70,6 +74,8 @@ export function IsometricGrid({
                                   tileOutlineColor,
                                   highlightIndex,
                                   highlightColor,
+                                  flashIndex,
+                                  flashColor,
                               }: Props) {
     const [viewport, setViewport] = useState({
         width: 0,
@@ -286,18 +292,21 @@ export function IsometricGrid({
             </View>
         );
 
-        if (tileOutlineColor || index === highlightIndex) {
+        if (tileOutlineColor || index === highlightIndex || index === flashIndex) {
             const isHighlight = index === highlightIndex;
+            const isFlash = index === flashIndex;
             const cx = x + tileWidth / 2;
             const cy = y + tileHeightStep / 2;
+            const points = `${cx},${y} ${x + tileWidth},${cy} ${cx},${y + tileHeightStep} ${x},${cy}`;
 
             outlinePolygons.push(
                 <Polygon
                     key={`outline-${index}`}
-                    points={`${cx},${y} ${x + tileWidth},${cy} ${cx},${y + tileHeightStep} ${x},${cy}`}
-                    fill="none"
-                    stroke={isHighlight ? highlightColor : tileOutlineColor}
-                    strokeWidth={isHighlight ? 2 : 1}
+                    points={points}
+                    fill={isFlash ? flashColor : 'none'}
+                    fillOpacity={isFlash ? 0.35 : 1}
+                    stroke={isHighlight ? highlightColor : isFlash ? flashColor : tileOutlineColor}
+                    strokeWidth={isHighlight || isFlash ? 2 : 1}
                 />
             );
         }
