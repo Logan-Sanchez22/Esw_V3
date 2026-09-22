@@ -10,10 +10,12 @@ import {
     DEFAULT_GROUND,
     GardenDomainState,
     GRID_SIZE,
+    GroundFormation,
     PlacedItemId,
     TileState,
     UndoableAction,
     moveItem as moveItemInState,
+    paintFormation as paintFormationInState,
     paintGround as paintGroundInState,
     placeItem as placeItemInState,
     removeItem as removeItemInState,
@@ -85,6 +87,7 @@ type Store = {
     removeItem: (index: number) => void;
     moveItem: (fromIndex: number, toIndex: number) => void;
     paintGround: (index: number, groundId: string) => void;
+    paintFormation: (index: number, formation: GroundFormation) => void;
     addPoints: (amount: number) => void;
     resetGarden: () => void;
     /** The single most recent place/move/remove, or null once undone or
@@ -283,6 +286,10 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         setState((prev) => paintGroundInState(prev, index, groundId));
     };
 
+    const paintFormation = (index: number, formation: GroundFormation) => {
+        setState((prev) => paintFormationInState(prev, index, formation));
+    };
+
     const addPoints = (amount: number) => {
         setState((prev) => addPointsToState(prev, amount));
     };
@@ -306,6 +313,7 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
                 removeItem,
                 moveItem,
                 paintGround,
+                paintFormation,
                 addPoints,
                 resetGarden,
                 lastAction,

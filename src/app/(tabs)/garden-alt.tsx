@@ -29,8 +29,12 @@ import {
     DEFAULT_CATALOG_ITEM_ID,
     GRID_SIZE,
     GROUND_CATALOG,
+    GROUND_FORMATIONS,
     REMOVE_TOOL_ID,
+    canPaintFormation,
     getCatalogItem,
+    getFootprintCells,
+    getGroundFormation,
     getItemFootprint,
     getMoveBlock,
     getPlacementBlock,
@@ -117,11 +121,37 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => gro
     })
 );
 
+// Multi-tile ground stamps (e.g. Lake) appended after the plain single-tile
+// brushes — same row, distinguished by their sizeLabel badge. Icon reuses
+// the formation's target ground type's own sprite (a Lake's icon is just
+// the water tile), same lookup GROUND_PICKER_ITEMS uses above.
+const GROUND_FORMATION_PICKER_ITEMS: PickerEntry[] = GROUND_FORMATIONS.filter(
+    (formation) => formation.groundId in GROUND_SPRITE
+).map((formation) => ({
+    id: formation.id,
+    label: formation.label,
+    cost: 0,
+    icon: (
+        <AtlasSprite
+            atlas={topDownGroundAtlas}
+            sprite={GROUND_SPRITE[formation.groundId]}
+            size={PICKER_ICON_SIZE}
+            fit="stretch"
+        />
+    ),
+    sizeLabel: `${formation.footprint.width}×${formation.footprint.height}`,
+}));
+
+const ALL_GROUND_PICKER_ITEMS: PickerEntry[] = [...GROUND_PICKER_ITEMS, ...GROUND_FORMATION_PICKER_ITEMS];
+
 const GardenAlt = () => {
-    const { state, placeItem, removeItem, moveItem, paintGround, lastAction, undoLastAction } = useGardenDomain();
+    const { state, placeItem, removeItem, moveItem, paintGround, paintFormation, lastAction, undoLastAction } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
+    // Holds either a plain GROUND_CATALOG id (painted immediately on tap) or
+    // a GROUND_FORMATIONS id (previewed first — see selectedFormation below).
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
+    const selectedFormation = getGroundFormation(selectedGroundId);
     const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
     const { message, showMessage } = useStatusMessage();
     const insets = useSafeAreaInsets();
@@ -131,10 +161,25 @@ const GardenAlt = () => {
     // pure UI state, never touches domain state until Confirm is tapped.
     const [previewIndex, setPreviewIndex] = useState<number | null>(null);
 
+    // Same idea as previewIndex, but for a pending ground formation stamp
+    // (e.g. Lake) — kept separate rather than reusing previewIndex since a
+    // formation isn't a CatalogItem (no cost/unlock, a GroundFormation
+    // instead) and shouldn't share that flow's assumptions.
+    const [paintPreviewIndex, setPaintPreviewIndex] = useState<number | null>(null);
+
     // A stale ghost must never keep showing once what's selected changes.
     useEffect(() => {
         setPreviewIndex(null);
-    }, [selectedItemId, mode]);
+        setPaintPreviewIndex(null);
+    }, [selectedItemId, selectedGroundId, mode]);
+
+    // Every tile a pending formation stamp would actually paint, for the
+    // ghost overlay in renderTile below — empty whenever nothing's pending.
+    const formationPreviewCells = useMemo(() => {
+        if (paintPreviewIndex === null || !selectedFormation) return new Set<number>();
+        const cells = getFootprintCells(paintPreviewIndex, selectedFormation.footprint.width, selectedFormation.footprint.height);
+        return new Set(cells ?? []);
+    }, [paintPreviewIndex, selectedFormation]);
 
     // Interact mode: tapping a placed decoration shows an info card
     // (interactSelectedIndex). Tapping its Move button captures which item
@@ -285,9 +330,13 @@ const GardenAlt = () => {
             state.tiles.forEach((_, i) => {
                 if (getMoveBlock(state, moveFromIndex, i) !== null) set.add(i);
             });
+        } else if (mode === 'paint' && selectedFormation) {
+            state.tiles.forEach((_, i) => {
+                if (!canPaintFormation(i, selectedFormation)) set.add(i);
+            });
         }
         return set;
-    }, [mode, selectedItemId, moveFromIndex, state]);
+    }, [mode, selectedItemId, moveFromIndex, selectedFormation, state]);
 
     // Catalog items actually selectable right now — has art on this screen
     // AND matches the active category filter ('all' keeps everything, same
@@ -420,7 +469,7 @@ const GardenAlt = () => {
                 </>
             ) : mode === 'paint' ? (
                 <ItemPicker
-                    items={GROUND_PICKER_ITEMS}
+                    items={ALL_GROUND_PICKER_ITEMS}
                     selectedId={selectedGroundId}
                     onSelect={setSelectedGroundId}
                     points={state.points}
@@ -470,7 +519,9 @@ const GardenAlt = () => {
                                   : tile.item;
                         const isGhost = isDecoratePreview || isMovePreview;
                         const isPopping = justPlacedIndex === i;
-                        const isHighlighted = isDecoratePreview || isMovePreview || isInteractSelected;
+                        const isPaintPreview = i === paintPreviewIndex;
+                        const isFormationPreviewCell = formationPreviewCells.has(i);
+                        const isHighlighted = isDecoratePreview || isMovePreview || isInteractSelected || isPaintPreview;
                         const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
                         const groundKey = getGroundSpriteKey(tile.ground, i);
                         const itemCatalogEntry = itemId ? getCatalogItem(itemId) : undefined;
@@ -500,7 +551,16 @@ const GardenAlt = () => {
                                 }}
                                 onPress={() => {
                                     if (mode === 'paint') {
-                                        paintGround(i, selectedGroundId);
+                                        if (selectedFormation) {
+                                            if (!canPaintFormation(i, selectedFormation)) {
+                                                showMessage('Not enough room here');
+                                                flashInvalid(i);
+                                            } else {
+                                                setPaintPreviewIndex(i);
+                                            }
+                                        } else {
+                                            paintGround(i, selectedGroundId);
+                                        }
                                         return;
                                     }
 
@@ -591,6 +651,15 @@ const GardenAlt = () => {
                                         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(239,68,68,0.35)' }}
                                     />
                                 )}
+                                {/* Pending formation ghost (e.g. Lake) — every tile it
+                                 would actually paint, tinted toward its target ground
+                                 color, until Confirm/Cancel resolves it. */}
+                                {isFormationPreviewCell && (
+                                    <View
+                                        pointerEvents="none"
+                                        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.info, opacity: 0.45 }}
+                                    />
+                                )}
                                 {itemId && (
                                     <Animated.View
                                         style={{
@@ -644,6 +713,19 @@ const GardenAlt = () => {
                             setPreviewIndex(null);
                         }}
                         onCancel={() => setPreviewIndex(null)}
+                    />
+                )}
+                {paintPreviewIndex !== null && selectedFormation && (
+                    <PlacementConfirmBar
+                        itemLabel={selectedFormation.label}
+                        actionLabel="Paint"
+                        bottom={bottomNavSpace + 12}
+                        onConfirm={() => {
+                            paintFormation(paintPreviewIndex, selectedFormation);
+                            flyToTile(paintPreviewIndex);
+                            setPaintPreviewIndex(null);
+                        }}
+                        onCancel={() => setPaintPreviewIndex(null)}
                     />
                 )}
                 {interactSelectedIndex !== null && (

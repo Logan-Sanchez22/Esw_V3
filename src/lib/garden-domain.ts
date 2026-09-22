@@ -212,6 +212,57 @@ export function paintGround(state: GardenDomainState, index: number, groundId: s
   return { ...state, tiles };
 }
 
+/**
+ * A named multi-tile ground "stamp" — paints every tile in its footprint to
+ * one ground type in a single placement (e.g. a Lake paints a 3x2 block of
+ * water), anchored at whichever tile was tapped the same way a
+ * CatalogItem.footprint decoration is. Distinct from the single-tile ground
+ * brush (GROUND_CATALOG, still used for free-form painting): a formation is
+ * a deliberate, previewed placement, not a continuous paint tool. Also free
+ * (ground painting has never cost points) and, unlike decorations, has no
+ * undo — it isn't tracked as an owned, movable/removable unit, just a bulk
+ * ground repaint; painting over it (with the brush or another formation) is
+ * how you change your mind.
+ */
+export type GroundFormation = {
+  id: string;
+  label: string;
+  groundId: string;
+  footprint: { width: number; height: number };
+};
+
+export const GROUND_FORMATIONS: GroundFormation[] = [
+  { id: 'lake', label: 'Lake', groundId: 'water', footprint: { width: 3, height: 2 } },
+];
+
+export function getGroundFormation(id: string): GroundFormation | undefined {
+  return GROUND_FORMATIONS.find((formation) => formation.id === id);
+}
+
+/** The only thing that can block a formation is running off the grid edge —
+ * ground painting has never checked occupancy or terrain (you can already
+ * repaint under an existing decoration with the single-tile brush; a
+ * formation is the same free-form repaint, just stamped over more tiles at
+ * once), so this stays consistent with that rather than inventing new rules
+ * ground painting doesn't otherwise have. */
+export function canPaintFormation(index: number, formation: GroundFormation): boolean {
+  return getFootprintCells(index, formation.footprint.width, formation.footprint.height) !== null;
+}
+
+export function paintFormation(
+  state: GardenDomainState,
+  index: number,
+  formation: GroundFormation
+): GardenDomainState {
+  const cells = getFootprintCells(index, formation.footprint.width, formation.footprint.height);
+  if (cells === null) return state;
+  const tiles = [...state.tiles];
+  for (const cell of cells) {
+    tiles[cell] = { ...tiles[cell], ground: formation.groundId };
+  }
+  return { ...state, tiles };
+}
+
 export type PlacementBlock =
   | 'occupied'
   | 'non-placeable-terrain'
