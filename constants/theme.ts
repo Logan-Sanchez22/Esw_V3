@@ -66,12 +66,19 @@ export const typography = {
  * most visible (you're deciding tile boundaries); Interact mode dims it most
  * (you're just looking/moving things, the grid should stay out of the way);
  * Decorate sits in between. Never fully 0 — a preview/flash tile's own
- * outline always overrides this and stays fully opaque regardless of mode.
+ * outline always overrides this and stays fully opaque regardless of mode
+ * (see IsometricGrid's highlightIndex/flashIndex and garden-alt.tsx's
+ * isHighlighted/isFlash — neither reads this value at all).
+ *
+ * Lowered a further notch (demo-polish pass) — at the previous values the
+ * grid still read as a level-editor overlay at rest, especially on the
+ * top-down screen's flat square tiles. Placement/move/invalid feedback is
+ * untouched, since that's the always-opaque override above, not this.
  */
 export const gridOutlineOpacity = {
-    paint: 0.55,
-    decorate: 0.25,
-    interact: 0.12,
+    paint: 0.35,
+    decorate: 0.1,
+    interact: 0.05,
 } as const;
 
 /** "#rrggbb" -> "rgba(r,g,b,alpha)" — for a View borderColor, which (unlike

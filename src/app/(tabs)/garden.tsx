@@ -446,7 +446,7 @@ const Garden = () => {
     };
 
     return (
-        <SafeAreaView className={"flex-1 bg-sky"}>
+        <SafeAreaView className={"flex-1 bg-background"}>
             <View className="p-5">
                 <ScreenHeader title="Isometric Garden" />
                 <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8, marginTop: -8 }}>
@@ -516,6 +516,15 @@ const Garden = () => {
                 style={{
                     flex: 1,
                     paddingBottom: bottomNavSpace,
+                    // A subtle panel behind the garden viewport (same token
+                    // as every Card elsewhere in the app) — the garden used
+                    // to sit directly on a bright sky-blue page background
+                    // that clashed with the rest of the app's dark theme;
+                    // this gives it a distinct "hero panel" instead of just
+                    // floating on the page. Doesn't affect IsometricGrid's
+                    // own sizing — it measures its actual container via
+                    // onLayout, not a hardcoded assumption.
+                    backgroundColor: colors.card,
                 }}
             >
                 <IsometricGrid

@@ -423,7 +423,7 @@ const GardenAlt = () => {
     };
 
     return (
-        <SafeAreaView className={"flex-1 bg-sky"}>
+        <SafeAreaView className={"flex-1 bg-background"}>
             <View className="p-5">
                 <ScreenHeader title="Top-Down Garden" />
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: -8 }}>
@@ -484,7 +484,13 @@ const GardenAlt = () => {
                 </View>
             )}
 
-            <View style={{ flex: 1 }}>
+            {/* Same panel treatment as the isometric screen (colors.card
+             behind the grid) — purely a background color, no size/margin
+             change, so PannableGrid's window-based viewport math above is
+             unaffected. The garden used to sit directly on a bright
+             sky-blue page background; this gives both screens a shared
+             "hero panel" instead. */}
+            <View style={{ flex: 1, backgroundColor: colors.card }}>
                 <PannableGrid
                     gridSize={GRID_SIZE}
                     tileSize={TILE_SIZE}
