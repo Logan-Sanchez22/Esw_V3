@@ -306,7 +306,7 @@ export function IsometricGrid({
                     fill={isFlash ? flashColor : 'none'}
                     fillOpacity={isFlash ? 0.35 : 1}
                     stroke={isHighlight ? highlightColor : isFlash ? flashColor : tileOutlineColor}
-                    strokeWidth={isHighlight || isFlash ? 2 : 1}
+                    strokeWidth={isHighlight || isFlash ? 1.5 : 0.5}
                 />
             );
         }

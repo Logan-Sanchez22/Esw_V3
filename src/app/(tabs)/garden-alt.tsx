@@ -5,7 +5,6 @@ import {
     SafeAreaView as RNSafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { DecorationShadow } from '@/components/DecorationShadow';
@@ -199,9 +198,7 @@ const GardenAlt = () => {
                                     />
                                 )}
                                 {itemId && (
-                                    <Animated.View
-                                        entering={ZoomIn.duration(180)}
-                                        exiting={FadeOut.duration(150)}
+                                    <View
                                         style={{
                                             position: 'absolute',
                                             bottom: 0,
@@ -217,7 +214,7 @@ const GardenAlt = () => {
                                             // (e.g. bench) — see UnknownItemMarker.
                                             <UnknownItemMarker size={decorationSize} />
                                         )}
-                                    </Animated.View>
+                                    </View>
                                 )}
                             </TouchableOpacity>
                         );

@@ -6,7 +6,6 @@ import {
     SafeAreaView as RNSafeAreaView,
     useSafeAreaInsets,
 } from "react-native-safe-area-context";
-import Animated, { FadeOut, ZoomIn } from 'react-native-reanimated';
 
 import { AtlasSprite } from '@/components/AtlasSprite';
 import { DecorationShadow } from '@/components/DecorationShadow';
@@ -246,11 +245,7 @@ const Garden = () => {
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
 
                         return (
-                            <Animated.View
-                                entering={ZoomIn.duration(180)}
-                                exiting={FadeOut.duration(150)}
-                                style={isPreview ? { opacity: 0.55 } : undefined}
-                            >
+                            <View style={isPreview ? { opacity: 0.55 } : undefined}>
                                 {/* Invisible — exists only so this decoration's height/anchor
                                  math matches this tile's own ground sprite's (same variant,
                                  since variants can differ slightly in native size), without
@@ -283,7 +278,7 @@ const Garden = () => {
                                         <UnknownItemMarker size={decorationSize} />
                                     )}
                                 </View>
-                            </Animated.View>
+                            </View>
                         );
                     }}
                 />
