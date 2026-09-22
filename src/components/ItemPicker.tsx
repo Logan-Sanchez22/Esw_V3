@@ -21,6 +21,9 @@ export type PickerEntry = {
     locked?: boolean;
     /** Shown under the label when locked, e.g. "Unlocks at 20 pts earned". */
     lockedHint?: string;
+    /** e.g. "2×1" — shown as a small badge for anything bigger than a single
+     * tile (see CatalogItem.footprint). Undefined for the common 1x1 case. */
+    sizeLabel?: string;
 };
 
 type Props = {
@@ -78,6 +81,9 @@ function PickerItemButton({
                 <Text numberOfLines={1} style={{ fontSize: 10, color: 'white', marginTop: 4 }}>
                     {item.label}
                 </Text>
+                {item.sizeLabel && (
+                    <Text style={{ fontSize: 8, color: colors.mutedForeground, marginTop: 1 }}>{item.sizeLabel}</Text>
+                )}
                 {locked ? (
                     <Text numberOfLines={1} style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>
                         🔒 {item.lockedHint ?? 'Locked'}

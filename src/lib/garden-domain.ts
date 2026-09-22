@@ -8,7 +8,18 @@ export const DEFAULT_GROUND = 'grass';
 /** A tile now carries both what it's planted with AND what it's made of. */
 export type TileState = {
   ground: string;
+  /** Set only on a placement's anchor tile (see CatalogItem.footprint) —
+   * null on an empty tile AND on any other tile a multi-tile item's
+   * footprint also occupies (those carry `anchorIndex` instead). */
   item: PlacedItemId;
+  /** Present only on a tile that's occupied as part of another tile's
+   * multi-tile footprint (never on the anchor itself, never on an empty
+   * tile) — points back to the anchor tile's index, so a tap anywhere in
+   * the footprint (not just its anchor) can resolve which placement it
+   * belongs to. See resolvePlacement. Optional and additive: every
+   * existing 1x1 placement never sets this, so old saved gardens (and the
+   * jsonb column they sync to) need no migration. */
+  anchorIndex?: number;
 };
 
 /**
@@ -47,6 +58,14 @@ export type CatalogItem = {
    * higher-cost ones picked as early milestones).
    */
   unlockThreshold?: number;
+  /**
+   * Tiles this item occupies when placed, anchored at whichever tile was
+   * tapped to place it (that tap becomes the footprint's top-left corner;
+   * it expands right/down from there). Undefined = 1x1, the default and by
+   * far the common case — every existing item is unaffected. See
+   * getItemFootprint/getFootprintCells below.
+   */
+  footprint?: { width: number; height: number };
 };
 
 export type GardenDomainState = {
@@ -73,13 +92,87 @@ export function isItemUnlocked(state: GardenDomainState, item: CatalogItem): boo
   return item.unlockThreshold === undefined || state.totalPointsEarned >= item.unlockThreshold;
 }
 
-export function canPlace(state: GardenDomainState, index: number, item: CatalogItem): boolean {
-  if (index < 0 || index >= state.tiles.length) return false;
+/** A tile with nothing on it at all — neither a real item nor another
+ * tile's footprint reaching into it. */
+export function isTileEmpty(tile: TileState): boolean {
+  return tile.item === null && tile.anchorIndex === undefined;
+}
+
+/** 1x1 default for every item that doesn't declare a footprint. */
+export function getItemFootprint(item: CatalogItem): { width: number; height: number } {
+  return item.footprint ?? { width: 1, height: 1 };
+}
+
+/**
+ * Every tile index a footprint anchored at `anchorIndex` would occupy, or
+ * null if any of it would fall outside the grid — a footprint can't wrap
+ * across a row boundary the way a naive `anchorIndex + n` walk would allow,
+ * so this works in row/col space instead of flat index arithmetic.
+ */
+export function getFootprintCells(anchorIndex: number, width: number, height: number): number[] | null {
+  const anchorRow = Math.floor(anchorIndex / GRID_SIZE);
+  const anchorCol = anchorIndex % GRID_SIZE;
+  if (anchorCol + width > GRID_SIZE || anchorRow + height > GRID_SIZE) return null;
+
+  const cells: number[] = [];
+  for (let r = 0; r < height; r++) {
+    for (let c = 0; c < width; c++) {
+      cells.push((anchorRow + r) * GRID_SIZE + (anchorCol + c));
+    }
+  }
+  return cells;
+}
+
+/**
+ * Resolves any tile a placement touches — its anchor, or another tile a
+ * multi-tile footprint reaches into — back to that placement's anchor index
+ * and item id. Null if the tile is empty. Every remove/move/interact tap
+ * handler resolves through this first, so tapping anywhere in a multi-tile
+ * item's footprint (not just the corner it was placed from) behaves the
+ * same as tapping the anchor itself.
+ */
+export function resolvePlacement(
+  state: GardenDomainState,
+  index: number
+): { anchorIndex: number; itemId: string } | null {
+  if (index < 0 || index >= state.tiles.length) return null;
   const tile = state.tiles[index];
-  if (tile.item !== null) return false;
-  if (!isGroundPlaceable(tile.ground)) return false;
-  if (!isItemUnlocked(state, item)) return false;
-  return state.points >= item.cost;
+  if (tile.item !== null) return { anchorIndex: index, itemId: tile.item };
+  if (tile.anchorIndex !== undefined) {
+    const anchorItem = state.tiles[tile.anchorIndex]?.item;
+    if (anchorItem !== null && anchorItem !== undefined) {
+      return { anchorIndex: tile.anchorIndex, itemId: anchorItem };
+    }
+  }
+  return null;
+}
+
+/** Clears every cell of a footprint anchored at `anchorIndex` back to empty. */
+function clearFootprint(tiles: TileState[], anchorIndex: number, width: number, height: number): void {
+  const cells = getFootprintCells(anchorIndex, width, height) ?? [anchorIndex];
+  for (const cell of cells) {
+    tiles[cell] = { ...tiles[cell], item: null, anchorIndex: undefined };
+  }
+}
+
+/** Occupies every cell of a footprint anchored at `anchorIndex` with `itemId`. */
+function occupyFootprint(
+  tiles: TileState[],
+  anchorIndex: number,
+  itemId: string,
+  width: number,
+  height: number
+): void {
+  tiles[anchorIndex] = { ...tiles[anchorIndex], item: itemId };
+  const cells = getFootprintCells(anchorIndex, width, height) ?? [anchorIndex];
+  for (const cell of cells) {
+    if (cell === anchorIndex) continue;
+    tiles[cell] = { ...tiles[cell], item: null, anchorIndex };
+  }
+}
+
+export function canPlace(state: GardenDomainState, index: number, item: CatalogItem): boolean {
+  return getPlacementBlock(state, index, item) === null;
 }
 
 export function placeItem(
@@ -88,8 +181,9 @@ export function placeItem(
   item: CatalogItem
 ): GardenDomainState {
   if (!canPlace(state, index, item)) return state;
+  const { width, height } = getItemFootprint(item);
   const tiles = [...state.tiles];
-  tiles[index] = { ...tiles[index], item: item.id };
+  occupyFootprint(tiles, index, item.id, width, height);
   return { ...state, points: state.points - item.cost, tiles };
 }
 
@@ -97,12 +191,15 @@ export function addPoints(state: GardenDomainState, amount: number): GardenDomai
   return { ...state, points: state.points + amount, totalPointsEarned: state.totalPointsEarned + amount };
 }
 
-/** Clears a tile's planting back to empty. No point refund — placing is a deliberate sink. */
+/** Clears a placement back to empty, wherever in its footprint `index`
+ * lands. No point refund — placing is a deliberate sink. */
 export function removeItem(state: GardenDomainState, index: number): GardenDomainState {
-  if (index < 0 || index >= state.tiles.length) return state;
-  if (state.tiles[index].item === null) return state;
+  const resolved = resolvePlacement(state, index);
+  if (!resolved) return state;
+  const item = getCatalogItem(resolved.itemId);
+  const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
   const tiles = [...state.tiles];
-  tiles[index] = { ...tiles[index], item: null };
+  clearFootprint(tiles, resolved.anchorIndex, width, height);
   return { ...state, tiles };
 }
 
@@ -115,34 +212,67 @@ export function paintGround(state: GardenDomainState, index: number, groundId: s
   return { ...state, tiles };
 }
 
-export type PlacementBlock = 'occupied' | 'non-placeable-terrain' | 'locked' | 'insufficient-points' | null;
+export type PlacementBlock =
+  | 'occupied'
+  | 'non-placeable-terrain'
+  | 'locked'
+  | 'insufficient-points'
+  | 'out-of-bounds'
+  | null;
 
-/** Why a placement would fail, for UI feedback — canPlace() collapses this to a bool. */
+/**
+ * Why a placement would fail, for UI feedback — canPlace() collapses this to
+ * a bool. `index` is the tapped tile, which becomes the anchor (top-left
+ * corner) of the item's whole footprint — every cell that footprint would
+ * occupy is checked, not just `index` itself.
+ */
 export function getPlacementBlock(
   state: GardenDomainState,
   index: number,
   item: CatalogItem
 ): PlacementBlock {
   if (index < 0 || index >= state.tiles.length) return 'occupied';
-  const tile = state.tiles[index];
-  if (tile.item !== null) return 'occupied';
-  if (!isGroundPlaceable(tile.ground)) return 'non-placeable-terrain';
+  const { width, height } = getItemFootprint(item);
+  const cells = getFootprintCells(index, width, height);
+  if (cells === null) return 'out-of-bounds';
+
+  for (const cell of cells) {
+    const tile = state.tiles[cell];
+    if (!isTileEmpty(tile)) return 'occupied';
+    if (!isGroundPlaceable(tile.ground)) return 'non-placeable-terrain';
+  }
   if (!isItemUnlocked(state, item)) return 'locked';
   if (state.points < item.cost) return 'insufficient-points';
   return null;
 }
 
-export type MoveBlock = 'same-tile' | 'occupied' | 'non-placeable-terrain' | null;
+export type MoveBlock = 'same-tile' | 'occupied' | 'non-placeable-terrain' | 'out-of-bounds' | null;
 
 /** Why moving an already-placed item to toIndex would fail — no cost/unlock
  * checks, since the item is already owned and paid for; only whether the
- * destination itself can hold it. */
+ * destination itself can hold it. `fromIndex` must already be a resolved
+ * anchor (see resolvePlacement) — every cell the item's footprint would
+ * occupy at the new anchor is checked, excluding cells it already occupies
+ * at its current position (so a footprint can shift by less than its own
+ * width/height without tripping over itself). */
 export function getMoveBlock(state: GardenDomainState, fromIndex: number, toIndex: number): MoveBlock {
   if (fromIndex === toIndex) return 'same-tile';
-  if (toIndex < 0 || toIndex >= state.tiles.length) return 'occupied';
-  const toTile = state.tiles[toIndex];
-  if (toTile.item !== null) return 'occupied';
-  if (!isGroundPlaceable(toTile.ground)) return 'non-placeable-terrain';
+  if (fromIndex < 0 || fromIndex >= state.tiles.length) return 'occupied';
+  const fromItemId = state.tiles[fromIndex].item;
+  if (fromItemId === null) return 'occupied';
+
+  const item = getCatalogItem(fromItemId);
+  const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
+  const destCells = getFootprintCells(toIndex, width, height);
+  if (destCells === null) return 'out-of-bounds';
+
+  const sourceCells = new Set(getFootprintCells(fromIndex, width, height) ?? [fromIndex]);
+  for (const cell of destCells) {
+    if (sourceCells.has(cell)) continue;
+    const tile = state.tiles[cell];
+    if (!isTileEmpty(tile)) return 'occupied';
+    if (!isGroundPlaceable(tile.ground)) return 'non-placeable-terrain';
+  }
   return null;
 }
 
@@ -152,14 +282,19 @@ export function canMoveItem(state: GardenDomainState, fromIndex: number, toIndex
   return getMoveBlock(state, fromIndex, toIndex) === null;
 }
 
-/** Moves an already-placed item to an empty, placeable tile. Free — the
- * item is already owned; this only relocates it. */
+/** Moves an already-placed item to an empty, placeable tile (and its whole
+ * footprint, if it has one) — `fromIndex` must already be a resolved anchor
+ * (see resolvePlacement). Free — the item is already owned; this only
+ * relocates it. */
 export function moveItem(state: GardenDomainState, fromIndex: number, toIndex: number): GardenDomainState {
   if (!canMoveItem(state, fromIndex, toIndex)) return state;
+  const itemId = state.tiles[fromIndex].item as string;
+  const item = getCatalogItem(itemId);
+  const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
+
   const tiles = [...state.tiles];
-  const itemId = tiles[fromIndex].item;
-  tiles[fromIndex] = { ...tiles[fromIndex], item: null };
-  tiles[toIndex] = { ...tiles[toIndex], item: itemId };
+  clearFootprint(tiles, fromIndex, width, height);
+  occupyFootprint(tiles, toIndex, itemId, width, height);
   return { ...state, tiles };
 }
 
@@ -191,19 +326,25 @@ export type UndoableAction =
 export function undoAction(state: GardenDomainState, action: UndoableAction): GardenDomainState {
   switch (action.kind) {
     case 'place': {
+      const item = getCatalogItem(action.itemId);
+      const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
       const tiles = [...state.tiles];
-      tiles[action.index] = { ...tiles[action.index], item: null };
+      clearFootprint(tiles, action.index, width, height);
       return { ...state, points: state.points + action.cost, tiles };
     }
     case 'move': {
+      const item = getCatalogItem(action.itemId);
+      const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
       const tiles = [...state.tiles];
-      tiles[action.toIndex] = { ...tiles[action.toIndex], item: null };
-      tiles[action.fromIndex] = { ...tiles[action.fromIndex], item: action.itemId };
+      clearFootprint(tiles, action.toIndex, width, height);
+      occupyFootprint(tiles, action.fromIndex, action.itemId, width, height);
       return { ...state, tiles };
     }
     case 'remove': {
+      const item = getCatalogItem(action.itemId);
+      const { width, height } = item ? getItemFootprint(item) : { width: 1, height: 1 };
       const tiles = [...state.tiles];
-      tiles[action.index] = { ...tiles[action.index], item: action.itemId };
+      occupyFootprint(tiles, action.index, action.itemId, width, height);
       return { ...state, tiles };
     }
   }
@@ -233,7 +374,11 @@ export const CATALOG: CatalogItem[] = [
   { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, unlockThreshold: 40, category: 'nature' },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },
-  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures' },
+  // The one item using a multi-tile footprint so far (see
+  // CatalogItem.footprint) — a bench reads naturally as wider than a single
+  // tile, and "structures" is otherwise a one-item category, a reasonable
+  // place to prove out real tile-reservation cost for something premium.
+  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures', footprint: { width: 2, height: 1 } },
   // Top-down only for now — no honest iso counterpart in the 41 sprites
   // extracted from misc.png so far (lily pads/grass tufts aren't part of
   // that sheet's subject matter). Same asymmetry the iso side already has

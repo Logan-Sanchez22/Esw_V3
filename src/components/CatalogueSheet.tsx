@@ -89,6 +89,11 @@ export function CatalogueSheet({ visible, items, selectedId, points, onSelect, o
                                     <Text numberOfLines={1} style={{ fontSize: 10, color: 'white', marginTop: 4 }}>
                                         {item.label}
                                     </Text>
+                                    {item.sizeLabel && (
+                                        <Text style={{ fontSize: 8, color: colors.mutedForeground, marginTop: 1 }}>
+                                            {item.sizeLabel}
+                                        </Text>
+                                    )}
                                     {locked ? (
                                         <Text
                                             numberOfLines={2}

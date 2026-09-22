@@ -17,6 +17,7 @@ import {
     paintGround as paintGroundInState,
     placeItem as placeItemInState,
     removeItem as removeItemInState,
+    resolvePlacement,
     undoAction as undoActionInState,
 } from '@/lib/garden-domain';
 
@@ -259,11 +260,15 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
     };
 
     const removeItem = (index: number) => {
-        const itemId = state.tiles[index]?.item ?? null;
+        // Resolved rather than read directly off state.tiles[index] — index
+        // may land on any cell of a multi-tile footprint (see
+        // CatalogItem.footprint), not necessarily its anchor, and only the
+        // anchor cell's TileState.item is ever non-null.
+        const resolved = resolvePlacement(state, index);
         const next = removeItemInState(state, index);
-        if (next === state || itemId === null) return;
+        if (next === state || !resolved) return;
         setState(next);
-        setLastAction({ kind: 'remove', index, itemId });
+        setLastAction({ kind: 'remove', index: resolved.anchorIndex, itemId: resolved.itemId });
     };
 
     const moveItem = (fromIndex: number, toIndex: number) => {

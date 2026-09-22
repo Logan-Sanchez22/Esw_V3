@@ -31,10 +31,13 @@ import {
     GROUND_CATALOG,
     REMOVE_TOOL_ID,
     getCatalogItem,
+    getItemFootprint,
     getMoveBlock,
     getPlacementBlock,
     isItemUnlocked,
+    isTileEmpty,
     pickFallbackSelection,
+    resolvePlacement,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
@@ -268,7 +271,7 @@ const GardenAlt = () => {
         if (mode === 'decorate') {
             if (selectedItemId === REMOVE_TOOL_ID) {
                 state.tiles.forEach((tile, i) => {
-                    if (tile.item === null) set.add(i);
+                    if (isTileEmpty(tile)) set.add(i);
                 });
             } else {
                 const item = getCatalogItem(selectedItemId);
@@ -322,6 +325,7 @@ const GardenAlt = () => {
     const toPickerEntry = (item: (typeof CATALOG)[number]): PickerEntry => {
         const deco = getDecorationSprite(item.id, 'topDown')!;
         const locked = !isItemUnlocked(state, item);
+        const footprint = getItemFootprint(item);
         return {
             id: item.id,
             label: item.label,
@@ -329,6 +333,10 @@ const GardenAlt = () => {
             icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
             locked,
             lockedHint: locked ? `Unlocks at ${item.unlockThreshold} pts earned` : undefined,
+            // Only shown for anything bigger than the 1x1 default — see
+            // CatalogItem.footprint. Lets a player know before placing that
+            // it'll reserve more than one tile.
+            sizeLabel: footprint.width > 1 || footprint.height > 1 ? `${footprint.width}×${footprint.height}` : undefined,
         };
     };
 
@@ -509,27 +517,31 @@ const GardenAlt = () => {
                                             } else if (block === 'non-placeable-terrain') {
                                                 showMessage("Can't move onto water");
                                                 flashInvalid(i);
+                                            } else if (block === 'out-of-bounds') {
+                                                showMessage('Not enough room here');
+                                                flashInvalid(i);
                                             } else {
                                                 setMovePreviewIndex(i);
                                             }
                                             return;
                                         }
 
-                                        if (tile.item === null) {
+                                        const resolved = resolvePlacement(state, i);
+                                        if (!resolved) {
                                             showMessage('Nothing to interact with here');
                                             setInteractSelectedIndex(null);
                                             return;
                                         }
-                                        setInteractSelectedIndex((prev) => (prev === i ? null : i));
+                                        setInteractSelectedIndex((prev) => (prev === resolved.anchorIndex ? null : resolved.anchorIndex));
                                         return;
                                     }
 
                                     if (selectedItemId === REMOVE_TOOL_ID) {
-                                        const removedItemId = tile.item;
-                                        if (removedItemId === null) {
+                                        const resolved = resolvePlacement(state, i);
+                                        if (!resolved) {
                                             showMessage('Nothing to remove here');
                                         } else {
-                                            playRemoveFade(i, removedItemId);
+                                            playRemoveFade(resolved.anchorIndex, resolved.itemId);
                                             removeItem(i);
                                             playSound('remove');
                                         }
@@ -551,6 +563,9 @@ const GardenAlt = () => {
                                         flashInvalid(i);
                                     } else if (block === 'insufficient-points') {
                                         showMessage('Not enough points');
+                                        flashInvalid(i);
+                                    } else if (block === 'out-of-bounds') {
+                                        showMessage('Not enough room here');
                                         flashInvalid(i);
                                     } else {
                                         setPreviewIndex(i);
