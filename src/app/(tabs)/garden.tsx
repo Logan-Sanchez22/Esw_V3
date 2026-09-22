@@ -16,6 +16,7 @@ import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
 import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
+import { StatPill } from '@/components/ui';
 import { isoBlocksAtlas, IsoBlockKey } from '@/lib/atlases/iso-blocks-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import { pickVariant } from '@/lib/variantPick';
@@ -32,7 +33,7 @@ import {
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
-import { components } from '../../../constants/theme';
+import { colors, components } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -50,8 +51,8 @@ const SafeAreaView = styled(RNSafeAreaView);
 // tile's outline to trace its own sprite's real edge.
 const TILE_WIDTH = 60;
 const TILE_HEIGHT_STEP = 32;
-const TILE_OUTLINE_COLOR = '#4A3728';
-const PREVIEW_HIGHLIGHT_COLOR = '#facc15';
+const TILE_OUTLINE_COLOR = colors.tileOutline;
+const PREVIEW_HIGHLIGHT_COLOR = colors.highlight;
 
 const PICKER_ICON_SIZE = 32;
 
@@ -219,9 +220,12 @@ const Garden = () => {
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
                 <Text className="text-xl font-bold text-success mb-2">Isometric Garden</Text>
-                <Text className="text-mutedForeground mb-2">{state.points} pts · {state.totalPointsEarned} earned</Text>
+                <View style={{ flexDirection: 'row', gap: 8, marginBottom: 8 }}>
+                    <StatPill label="points" value={state.points} />
+                    <StatPill label="earned" value={state.totalPointsEarned} />
+                </View>
 
-                <Link href="/quest-page" style={{ color: '#6EE7B7', textDecorationLine: 'underline' }}>
+                <Link href="/quest-page" style={{ color: colors.mutedForeground, textDecorationLine: 'underline' }}>
                     Earn more points from Quests →
                 </Link>
 
@@ -268,7 +272,7 @@ const Garden = () => {
                     highlightIndex={previewIndex ?? movePreviewIndex ?? interactSelectedIndex}
                     highlightColor={PREVIEW_HIGHLIGHT_COLOR}
                     flashIndex={invalidFlashIndex}
-                    flashColor="#ef4444"
+                    flashColor={colors.flash}
                     flyTo={flyTo}
                     onTilePress={(index) => {
                         if (mode === 'paint') {

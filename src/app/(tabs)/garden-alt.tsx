@@ -15,6 +15,7 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
+import { StatPill } from '@/components/ui';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import {
@@ -30,6 +31,7 @@ import {
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
+import { colors } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
@@ -176,7 +178,10 @@ const GardenAlt = () => {
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
                 <Text className="text-xl font-bold text-success mb-2">TopDown Garden</Text>
-                <Text className="text-mutedForeground">{state.points} pts · {state.totalPointsEarned} earned</Text>
+                <View style={{ flexDirection: 'row', gap: 8 }}>
+                    <StatPill label="points" value={state.points} />
+                    <StatPill label="earned" value={state.totalPointsEarned} />
+                </View>
                 {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
@@ -242,7 +247,7 @@ const GardenAlt = () => {
                                     width: TILE_SIZE,
                                     height: TILE_SIZE,
                                     borderWidth: isHighlighted || isFlash ? 2 : 1,
-                                    borderColor: isFlash ? '#ef4444' : isHighlighted ? '#facc15' : '#4A3728',
+                                    borderColor: isFlash ? colors.flash : isHighlighted ? colors.highlight : colors.tileOutline,
                                     // Border eats into the content box (RN sizing is border-box) —
                                     // clip so the fixed-size ground sprite doesn't spill past it.
                                     overflow: 'hidden',

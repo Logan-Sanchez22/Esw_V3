@@ -1,5 +1,7 @@
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { colors } from '../../constants/theme';
+
 /**
  * Floating pill shown while a decoration placement is pending — the ghost
  * preview on the tile shows *where*, this shows *what* and lets you commit
@@ -54,10 +56,10 @@ export function PlacementConfirmBar({ itemLabel, bottom, actionLabel = 'Place', 
                     paddingVertical: 6,
                     paddingHorizontal: 14,
                     borderRadius: 999,
-                    backgroundColor: '#34D399',
+                    backgroundColor: colors.primary,
                 }}
             >
-                <Text style={{ color: '#020F09', fontWeight: '700' }}>✓ Confirm</Text>
+                <Text style={{ color: colors.background, fontWeight: '700' }}>✓ Confirm</Text>
             </TouchableOpacity>
         </View>
     );

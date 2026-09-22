@@ -1,5 +1,7 @@
 import { Text, TouchableOpacity, View } from 'react-native';
 
+import { colors } from '../../constants/theme';
+
 /**
  * Floating pill shown when a placed decoration is selected in Interact
  * mode — names it and offers Move. Distinct from PlacementConfirmBar:
@@ -49,10 +51,10 @@ export function DecorationInfoCard({ itemLabel, bottom, onMove, onClose }: Props
                     paddingVertical: 6,
                     paddingHorizontal: 14,
                     borderRadius: 999,
-                    backgroundColor: '#38bdf8',
+                    backgroundColor: colors.info,
                 }}
             >
-                <Text style={{ color: '#020F09', fontWeight: '700' }}>↔ Move</Text>
+                <Text style={{ color: colors.background, fontWeight: '700' }}>↔ Move</Text>
             </TouchableOpacity>
         </View>
     );

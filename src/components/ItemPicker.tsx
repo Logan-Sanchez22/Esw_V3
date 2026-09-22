@@ -2,6 +2,8 @@ import { ReactNode } from 'react';
 import { ScrollView, Text, TouchableOpacity } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
+import { colors } from '../../constants/theme';
+
 /**
  * Generic "what am I about to place" bar — a horizontal row of tappable
  * catalog items. This is plain UI (no isometric/top-down positioning math),
@@ -61,7 +63,7 @@ function PickerItemButton({
                     width: 64,
                     borderRadius: 10,
                     borderWidth: selected ? 2 : 1,
-                    borderColor: selected ? '#facc15' : 'rgba(255,255,255,0.15)',
+                    borderColor: selected ? colors.highlight : 'rgba(255,255,255,0.15)',
                     backgroundColor: 'rgba(0,0,0,0.25)',
                     opacity: locked ? 0.5 : affordable ? 1 : 0.4,
                     paddingVertical: 8,

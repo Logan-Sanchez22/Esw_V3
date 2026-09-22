@@ -13,6 +13,23 @@ export const colors = {
     // Matches global.css's existing --color-error — same red, named for what
     // it's actually used for (destructive actions), not the CSS variable's name.
     danger: "#F87171",
+    // The garden screens' selection/preview-outline accent — was duplicated
+    // as the raw hex '#facc15' independently in ItemPicker's selected-item
+    // border, both screens' PREVIEW_HIGHLIGHT_COLOR, and garden-alt's
+    // highlighted-tile border. Deliberately distinct from `warning`
+    // (#FBBF24, a different shade) since that token means "status/caution
+    // message," not "this is the thing you've selected."
+    highlight: "#facc15",
+    // The garden screens' "you can't place/move here" flash — was
+    // duplicated as raw hex independently in garden.tsx's flashColor prop
+    // and garden-alt.tsx's isFlash border color. Distinct from `danger` (a
+    // softer red, used for destructive-action buttons); this one needs to
+    // read as an urgent, momentary alert.
+    flash: "#ef4444",
+    // The isometric/top-down tile outline color — was duplicated as raw hex
+    // independently in garden.tsx's TILE_OUTLINE_COLOR and garden-alt.tsx's
+    // border-color fallback.
+    tileOutline: "#4A3728",
 } as const;
 
 // Five sizes, covering every screen in the app — see the UI Overhaul Roadmap's
