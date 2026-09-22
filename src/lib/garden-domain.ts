@@ -164,6 +164,52 @@ export function moveItem(state: GardenDomainState, fromIndex: number, toIndex: n
 }
 
 /**
+ * One place/move/remove the UI has already applied, kept just long enough
+ * to reverse it — see undoAction below. Not persisted (see
+ * garden-domain-store.tsx): undo only ever applies to the current session's
+ * single most recent action, standard undo semantics, not a saved history.
+ */
+export type UndoableAction =
+  | { kind: 'place'; index: number; itemId: string; cost: number }
+  | { kind: 'move'; fromIndex: number; toIndex: number; itemId: string }
+  | { kind: 'remove'; index: number; itemId: string };
+
+/**
+ * Reverses one already-applied action directly, bypassing the normal
+ * canPlace/cost/unlock checks placeItem enforces — this is undoing
+ * something that already validly happened, not making a new purchase, so
+ * re-validating it against (possibly since-changed) current state would be
+ * wrong. Always safe to call: the tile(s) involved can't have been touched
+ * by anything else since, because any other place/move/remove would have
+ * replaced this as "the last action" before undo could run.
+ *
+ * Undo refunds a placement's cost and restores a removed item for free —
+ * deliberately different from the Remove tool itself (no refund, a
+ * declared sink): Remove is "I don't want this," undo is "that wasn't what
+ * I meant," and those should feel different.
+ */
+export function undoAction(state: GardenDomainState, action: UndoableAction): GardenDomainState {
+  switch (action.kind) {
+    case 'place': {
+      const tiles = [...state.tiles];
+      tiles[action.index] = { ...tiles[action.index], item: null };
+      return { ...state, points: state.points + action.cost, tiles };
+    }
+    case 'move': {
+      const tiles = [...state.tiles];
+      tiles[action.toIndex] = { ...tiles[action.toIndex], item: null };
+      tiles[action.fromIndex] = { ...tiles[action.fromIndex], item: action.itemId };
+      return { ...state, tiles };
+    }
+    case 'remove': {
+      const tiles = [...state.tiles];
+      tiles[action.index] = { ...tiles[action.index], item: action.itemId };
+      return { ...state, tiles };
+    }
+  }
+}
+
+/**
  * The shared catalog of placeable items — same ids, labels and costs for both
  * garden screens, so picking "Tree" costs the same and behaves the same no
  * matter which view you're in. Each screen maps these ids to its own sprite

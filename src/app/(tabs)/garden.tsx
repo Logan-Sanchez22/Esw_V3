@@ -18,6 +18,7 @@ import { ModeToggle } from '@/components/ModeToggle';
 import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { ScreenHeader, StatPill } from '@/components/ui';
+import { UndoPill } from '@/components/UndoPill';
 import { isoBlocksAtlas, IsoBlockKey } from '@/lib/atlases/iso-blocks-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import { pickVariant } from '@/lib/variantPick';
@@ -137,7 +138,7 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
 }));
 
 const Garden = () => {
-    const { state, placeItem, removeItem, moveItem, paintGround } = useGardenDomain();
+    const { state, placeItem, removeItem, moveItem, paintGround, lastAction, undoLastAction } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_CATALOG[0].id);
@@ -360,6 +361,7 @@ const Garden = () => {
                     <StatPill label="points" value={state.points} />
                     <StatPill label="earned" value={state.totalPointsEarned} />
                 </View>
+                {lastAction && <UndoPill action={lastAction} onPress={undoLastAction} />}
 
                 <Link href="/quest-page" style={{ color: colors.mutedForeground, textDecorationLine: 'underline' }}>
                     Earn more points from Quests →

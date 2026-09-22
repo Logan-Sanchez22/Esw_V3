@@ -12,10 +12,12 @@ import {
     GRID_SIZE,
     PlacedItemId,
     TileState,
+    UndoableAction,
     moveItem as moveItemInState,
     paintGround as paintGroundInState,
     placeItem as placeItemInState,
     removeItem as removeItemInState,
+    undoAction as undoActionInState,
 } from '@/lib/garden-domain';
 
 // Debounce for pushing local changes to the server after the initial sync —
@@ -84,6 +86,10 @@ type Store = {
     paintGround: (index: number, groundId: string) => void;
     addPoints: (amount: number) => void;
     resetGarden: () => void;
+    /** The single most recent place/move/remove, or null once undone or
+     * superseded by a newer one — see garden-domain.ts's UndoableAction. */
+    lastAction: UndoableAction | null;
+    undoLastAction: () => void;
 };
 
 const GardenDomainContext = createContext<Store | null>(null);
@@ -107,6 +113,10 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
     // push effect below doesn't immediately echo it straight back.
     const skipNextPush = useRef(false);
     const pushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // In-memory only, deliberately not persisted or synced — undo is a
+    // this-session, single-step convenience, not saved history.
+    const [lastAction, setLastAction] = useState<UndoableAction | null>(null);
 
     useEffect(() => {
         AsyncStorage.getItem(STORAGE_KEY)
@@ -186,6 +196,9 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
                 if (isValidGardenState(serverState)) {
                     skipNextPush.current = true;
                     setState(serverState);
+                    // Whatever was locally undoable no longer applies to
+                    // the tile indices in this freshly-pulled state.
+                    setLastAction(null);
                 }
             } catch {
                 // Offline or server unreachable — local AsyncStorage state stands, try again next sign-in.
@@ -233,16 +246,32 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
         if (!isSignedIn) syncedUserId.current = null;
     }, [isSignedIn]);
 
+    // These read `state` directly (not a setState functional updater) so
+    // they can tell whether the domain call actually changed anything —
+    // needed to know whether to record it as undoable. Safe here: each is a
+    // single synchronous user-tap handler, not a rapid-fire batch where
+    // `state` could already be stale by the time it runs.
     const placeItem = (index: number, item: CatalogItem) => {
-        setState((prev) => placeItemInState(prev, index, item));
+        const next = placeItemInState(state, index, item);
+        if (next === state) return;
+        setState(next);
+        setLastAction({ kind: 'place', index, itemId: item.id, cost: item.cost });
     };
 
     const removeItem = (index: number) => {
-        setState((prev) => removeItemInState(prev, index));
+        const itemId = state.tiles[index]?.item ?? null;
+        const next = removeItemInState(state, index);
+        if (next === state || itemId === null) return;
+        setState(next);
+        setLastAction({ kind: 'remove', index, itemId });
     };
 
     const moveItem = (fromIndex: number, toIndex: number) => {
-        setState((prev) => moveItemInState(prev, fromIndex, toIndex));
+        const itemId = state.tiles[fromIndex]?.item ?? null;
+        const next = moveItemInState(state, fromIndex, toIndex);
+        if (next === state || itemId === null) return;
+        setState(next);
+        setLastAction({ kind: 'move', fromIndex, toIndex, itemId });
     };
 
     const paintGround = (index: number, groundId: string) => {
@@ -255,11 +284,28 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
 
     const resetGarden = () => {
         setState(createEmptyGarden());
+        setLastAction(null);
+    };
+
+    const undoLastAction = () => {
+        if (!lastAction) return;
+        setState((prev) => undoActionInState(prev, lastAction));
+        setLastAction(null);
     };
 
     return (
         <GardenDomainContext.Provider
-            value={{ state, placeItem, removeItem, moveItem, paintGround, addPoints, resetGarden }}
+            value={{
+                state,
+                placeItem,
+                removeItem,
+                moveItem,
+                paintGround,
+                addPoints,
+                resetGarden,
+                lastAction,
+                undoLastAction,
+            }}
         >
             {children}
         </GardenDomainContext.Provider>

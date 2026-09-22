@@ -17,6 +17,7 @@ import { PlacementConfirmBar } from '@/components/PlacementConfirmBar';
 import { UnknownItemMarker } from '@/components/UnknownItemMarker';
 import { PannableGrid } from '@/components/PannableGrid';
 import { ScreenHeader, StatPill } from '@/components/ui';
+import { UndoPill } from '@/components/UndoPill';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import { pickVariant } from '@/lib/variantPick';
@@ -42,7 +43,11 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const TILE_SIZE = 48;
 const PICKER_ICON_SIZE = 32;
-const HEADER_HEIGHT = 320; // title (ScreenHeader) + points + mode toggle + "see all" link + category filter + picker + safe area
+// Sized for the tallest case (the undo pill showing) rather than the
+// common case, so PannableGrid's computed viewport never extends its
+// content under the tab bar when the pill appears — a little unused space
+// at the bottom the rest of the time is the safer trade-off.
+const HEADER_HEIGHT = 360; // title (ScreenHeader) + points + undo pill + mode toggle + "see all" link + category filter + picker + safe area
 
 type Mode = 'decorate' | 'paint' | 'interact';
 
@@ -109,7 +114,7 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => gro
 );
 
 const GardenAlt = () => {
-    const { state, placeItem, removeItem, moveItem, paintGround } = useGardenDomain();
+    const { state, placeItem, removeItem, moveItem, paintGround, lastAction, undoLastAction } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
     const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
@@ -333,6 +338,7 @@ const GardenAlt = () => {
                     <StatPill label="points" value={state.points} />
                     <StatPill label="earned" value={state.totalPointsEarned} />
                 </View>
+                {lastAction && <UndoPill action={lastAction} onPress={undoLastAction} />}
                 {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
