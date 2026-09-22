@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity } from 'react-native'
+import { Animated, Easing, View, Text, TouchableOpacity } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import {
@@ -146,6 +146,40 @@ const GardenAlt = () => {
         setMoveFromIndex(null);
         setMoveItemId(null);
         setMovePreviewIndex(null);
+    };
+
+    // Placement/move pop and removal fade — plain legacy `Animated`
+    // (from 'react-native', not Reanimated) rather than a continuous
+    // Reanimated transform, matching the sway animation above: this screen's
+    // decorations render nested inside the pan/zoom gesture's own
+    // Reanimated-driven transform, and this session already hit one real
+    // on-device bug from a Reanimated layout entering/exiting animation
+    // misbehaving in exactly that nesting. Legacy Animated doesn't share
+    // Reanimated's worklet/layout-measurement system at all, so it sidesteps
+    // that failure mode entirely rather than betting on an unverified case.
+    const [justPlacedIndex, setJustPlacedIndex] = useState<number | null>(null);
+    const popAnim = useRef(new Animated.Value(0)).current;
+    const playPop = (index: number) => {
+        setJustPlacedIndex(index);
+        popAnim.setValue(0);
+        Animated.timing(popAnim, {
+            toValue: 1,
+            duration: 260,
+            easing: Easing.out(Easing.back(1.4)),
+            useNativeDriver: true,
+        }).start(() => setJustPlacedIndex(null));
+    };
+
+    const [justRemoved, setJustRemoved] = useState<{ index: number; itemId: string } | null>(null);
+    const removeFadeAnim = useRef(new Animated.Value(1)).current;
+    const playRemoveFade = (index: number, itemId: string) => {
+        setJustRemoved({ index, itemId });
+        removeFadeAnim.setValue(1);
+        Animated.timing(removeFadeAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => setJustRemoved(null));
     };
 
     // Eases the camera to a tile once, after a placement/move is confirmed —
@@ -407,18 +441,26 @@ const GardenAlt = () => {
                         const isInteractSelected = i === interactSelectedIndex;
                         const isFlash = i === invalidFlashIndex;
                         const isDimmed = !isFlash && dimIndices.has(i);
+                        // A tile that was just cleared by the Remove tool keeps rendering
+                        // its old item (from the snapshot taken at removal time, since
+                        // domain state has already dropped it) so playRemoveFade has
+                        // something to fade out instead of the sprite just vanishing.
+                        const isRemoving = justRemoved !== null && justRemoved.index === i;
                         // Hide the source tile's real item while a move is pending — it
                         // hasn't actually moved in domain state yet, but showing it fully
                         // there AND a ghost at the candidate destination reads as "in two
                         // places," not "picked up."
                         const itemId = isBeingMoved
                             ? null
-                            : isDecoratePreview
-                              ? selectedItemId
-                              : isMovePreview
-                                ? moveItemId
-                                : tile.item;
+                            : isRemoving
+                              ? justRemoved.itemId
+                              : isDecoratePreview
+                                ? selectedItemId
+                                : isMovePreview
+                                  ? moveItemId
+                                  : tile.item;
                         const isGhost = isDecoratePreview || isMovePreview;
+                        const isPopping = justPlacedIndex === i;
                         const isHighlighted = isDecoratePreview || isMovePreview || isInteractSelected;
                         const deco = itemId ? getDecorationSprite(itemId, 'topDown') : undefined;
                         const groundKey = getGroundSpriteKey(tile.ground, i);
@@ -428,7 +470,7 @@ const GardenAlt = () => {
                         // preview (still being positioned, should stay predictable) and
                         // never a rock/log/bench/mushroom (rigid objects don't sway).
                         const swayDeg =
-                            !isGhost && (itemCatalogEntry?.category === 'trees' || itemCatalogEntry?.category === 'plants')
+                            !isGhost && !isRemoving && (itemCatalogEntry?.category === 'trees' || itemCatalogEntry?.category === 'plants')
                                 ? getSwayDegrees(i, swayTick)
                                 : 0;
 
@@ -482,8 +524,13 @@ const GardenAlt = () => {
                                     }
 
                                     if (selectedItemId === REMOVE_TOOL_ID) {
-                                        if (tile.item === null) showMessage('Nothing to remove here');
-                                        else removeItem(i);
+                                        const removedItemId = tile.item;
+                                        if (removedItemId === null) {
+                                            showMessage('Nothing to remove here');
+                                        } else {
+                                            playRemoveFade(i, removedItemId);
+                                            removeItem(i);
+                                        }
                                         return;
                                     }
 
@@ -528,12 +575,12 @@ const GardenAlt = () => {
                                     />
                                 )}
                                 {itemId && (
-                                    <View
+                                    <Animated.View
                                         style={{
                                             position: 'absolute',
                                             bottom: 0,
                                             alignSelf: 'center',
-                                            opacity: isGhost ? 0.55 : 1,
+                                            opacity: isRemoving ? removeFadeAnim : isGhost ? 0.55 : 1,
                                         }}
                                     >
                                         <DecorationShadow size={decorationSize} />
@@ -542,7 +589,14 @@ const GardenAlt = () => {
                                          from its root rather than tipping over — the shadow
                                          stays put, matching how a real shadow wouldn't rotate
                                          with it. */}
-                                        <View style={{ transform: [{ rotate: `${swayDeg}deg` }], transformOrigin: '50% 100%' }}>
+                                        <Animated.View
+                                            style={{
+                                                transform: isPopping
+                                                    ? [{ rotate: `${swayDeg}deg` }, { scale: popAnim }]
+                                                    : [{ rotate: `${swayDeg}deg` }],
+                                                transformOrigin: '50% 100%',
+                                            }}
+                                        >
                                             {deco ? (
                                                 <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={decorationSize} />
                                             ) : (
@@ -550,8 +604,8 @@ const GardenAlt = () => {
                                                 // (e.g. bench) — see UnknownItemMarker.
                                                 <UnknownItemMarker size={decorationSize} />
                                             )}
-                                        </View>
-                                    </View>
+                                        </Animated.View>
+                                    </Animated.View>
                                 )}
                             </TouchableOpacity>
                         );
@@ -567,6 +621,7 @@ const GardenAlt = () => {
                             if (item && previewIndex !== null) {
                                 placeItem(previewIndex, item);
                                 flyToTile(previewIndex);
+                                playPop(previewIndex);
                             }
                             setPreviewIndex(null);
                         }}
@@ -596,6 +651,7 @@ const GardenAlt = () => {
                             if (moveFromIndex !== null) {
                                 moveItem(moveFromIndex, movePreviewIndex);
                                 flyToTile(movePreviewIndex);
+                                playPop(movePreviewIndex);
                             }
                             cancelMove();
                         }}

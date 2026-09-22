@@ -1,4 +1,4 @@
-import { View, Text } from 'react-native'
+import { Animated, Easing, View, Text } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import { Link } from "expo-router";
@@ -244,6 +244,43 @@ const Garden = () => {
         return () => clearInterval(id);
     }, [hasSwayableDecoration]);
 
+    // Placement/removal pop-in and fade-out. Deliberately built on the
+    // legacy react-native Animated API, not Reanimated: this session's own
+    // history includes one confirmed-on-device bug from a Reanimated LAYOUT
+    // animation (entering/exiting) misbehaving when nested inside the pan/
+    // zoom gesture's Reanimated-driven transform — that failure was
+    // specifically about Reanimated's own automatic layout-measurement
+    // pipeline, which legacy Animated has no equivalent of; a plain
+    // Animated.Value driving a transform/opacity composes at the native
+    // view layer the same way any other transform does, regardless of
+    // which library computed it. Single tile at a time — only one
+    // placement or removal is ever in flight — so one shared Animated.Value
+    // per effect is enough, no per-tile component needed.
+    const [justPlacedIndex, setJustPlacedIndex] = useState<number | null>(null);
+    const popAnim = useRef(new Animated.Value(0)).current;
+    const playPop = (index: number) => {
+        setJustPlacedIndex(index);
+        popAnim.setValue(0);
+        Animated.timing(popAnim, {
+            toValue: 1,
+            duration: 260,
+            easing: Easing.out(Easing.back(1.4)),
+            useNativeDriver: true,
+        }).start(() => setJustPlacedIndex(null));
+    };
+
+    const [justRemoved, setJustRemoved] = useState<{ index: number; itemId: string } | null>(null);
+    const removeFadeAnim = useRef(new Animated.Value(1)).current;
+    const playRemoveFade = (index: number, itemId: string) => {
+        setJustRemoved({ index, itemId });
+        removeFadeAnim.setValue(1);
+        Animated.timing(removeFadeAnim, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+        }).start(() => setJustRemoved(null));
+    };
+
     // Proactive "these tiles won't work" preview — every tile that would
     // block the current tool, shown continuously instead of only after a
     // blocked tap. Decorate mode dims occupied/water/etc. tiles for the
@@ -474,8 +511,13 @@ const Garden = () => {
                         }
 
                         if (selectedItemId === REMOVE_TOOL_ID) {
-                            if (state.tiles[index].item === null) showMessage('Nothing to remove here');
-                            else removeItem(index);
+                            const removedItemId = state.tiles[index].item;
+                            if (removedItemId === null) {
+                                showMessage('Nothing to remove here');
+                            } else {
+                                playRemoveFade(index, removedItemId);
+                                removeItem(index);
+                            }
                             return;
                         }
 
@@ -511,19 +553,27 @@ const Garden = () => {
                         const isDecoratePreview = index === previewIndex;
                         const isMovePreview = index === movePreviewIndex;
                         const isBeingMoved = index === moveFromIndex;
+                        // A tile that was just cleared by the Remove tool keeps rendering
+                        // its old item (from the snapshot taken at removal time, since
+                        // domain state has already dropped it) so playRemoveFade has
+                        // something to fade out instead of the sprite just vanishing.
+                        const isRemoving = justRemoved !== null && justRemoved.index === index;
                         // Hide the source tile's real item while a move is pending — it
                         // hasn't actually moved in domain state yet, but showing it
                         // fully there AND a ghost at the candidate destination reads as
                         // "in two places," not "picked up."
                         const itemId = isBeingMoved
                             ? null
-                            : isDecoratePreview
-                              ? selectedItemId
-                              : isMovePreview
-                                ? moveItemId
-                                : tile.item;
+                            : isRemoving
+                              ? justRemoved.itemId
+                              : isDecoratePreview
+                                ? selectedItemId
+                                : isMovePreview
+                                  ? moveItemId
+                                  : tile.item;
                         if (!itemId) return null;
                         const isGhost = isDecoratePreview || isMovePreview;
+                        const isPopping = justPlacedIndex === index;
 
                         const sprite = getDecorationSprite(itemId, 'isometric');
                         const catalogItem = getCatalogItem(itemId);
@@ -532,12 +582,20 @@ const Garden = () => {
                         // preview (still being positioned, should stay predictable) and
                         // never a rock/log/bench/mushroom (rigid objects don't sway).
                         const swayDeg =
-                            !isGhost && (catalogItem?.category === 'trees' || catalogItem?.category === 'plants')
+                            !isGhost && !isRemoving && (catalogItem?.category === 'trees' || catalogItem?.category === 'plants')
                                 ? getSwayDegrees(index, swayTick)
                                 : 0;
 
                         return (
-                            <View style={isGhost ? { opacity: 0.55 } : undefined}>
+                            <Animated.View
+                                style={
+                                    isRemoving
+                                        ? { opacity: removeFadeAnim }
+                                        : isGhost
+                                          ? { opacity: 0.55 }
+                                          : undefined
+                                }
+                            >
                                 {/* Reference box matching the tile's own TOP FACE — this tile
                                  set draws each tile as a pseudo-3D block (flat top + shaded
                                  sides, see the TILE_HEIGHT_STEP comment above), and a
@@ -563,7 +621,14 @@ const Garden = () => {
                                      (transformOrigin bottom-center) so it reads as bending
                                      from its root rather than tipping over — the shadow stays
                                      put, matching how a real shadow wouldn't rotate with it. */}
-                                    <View style={{ transform: [{ rotate: `${swayDeg}deg` }], transformOrigin: '50% 100%' }}>
+                                    <Animated.View
+                                        style={{
+                                            transform: isPopping
+                                                ? [{ rotate: `${swayDeg}deg` }, { scale: popAnim }]
+                                                : [{ rotate: `${swayDeg}deg` }],
+                                            transformOrigin: '50% 100%',
+                                        }}
+                                    >
                                         {sprite ? (
                                             <AtlasSprite
                                                 atlas={sprite.atlas}
@@ -575,9 +640,9 @@ const Garden = () => {
                                             // (e.g. lilyPad, grassTuft) — see UnknownItemMarker.
                                             <UnknownItemMarker size={decorationSize} />
                                         )}
-                                    </View>
+                                    </Animated.View>
                                 </View>
-                            </View>
+                            </Animated.View>
                         );
                     }}
                 />
@@ -591,6 +656,7 @@ const Garden = () => {
                             if (item && previewIndex !== null) {
                                 placeItem(previewIndex, item);
                                 flyToTile(previewIndex);
+                                playPop(previewIndex);
                             }
                             setPreviewIndex(null);
                         }}
@@ -620,6 +686,7 @@ const Garden = () => {
                             if (moveFromIndex !== null) {
                                 moveItem(moveFromIndex, movePreviewIndex);
                                 flyToTile(movePreviewIndex);
+                                playPop(movePreviewIndex);
                             }
                             cancelMove();
                         }}
