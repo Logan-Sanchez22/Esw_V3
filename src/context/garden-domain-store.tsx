@@ -18,6 +18,7 @@ import {
     paintFormation as paintFormationInState,
     paintGround as paintGroundInState,
     placeItem as placeItemInState,
+    pruneStaleFootprints,
     removeItem as removeItemInState,
     resolvePlacement,
     undoAction as undoActionInState,
@@ -134,7 +135,11 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
                     (parsed as PersistedGardenBlob).version === CURRENT_VERSION &&
                     isValidGardenState((parsed as PersistedGardenBlob).state)
                 ) {
-                    setState((parsed as PersistedGardenBlob).state);
+                    // Prunes any anchorIndex left stale by a catalog item's
+                    // footprint having since shrunk (e.g. Bench going back
+                    // to 1x1 after briefly being 2x1) — see
+                    // pruneStaleFootprints' own comment in garden-domain.ts.
+                    setState(pruneStaleFootprints((parsed as PersistedGardenBlob).state));
                     return;
                 }
 
@@ -199,7 +204,7 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
                 const serverState = await res.json();
                 if (isValidGardenState(serverState)) {
                     skipNextPush.current = true;
-                    setState(serverState);
+                    setState(pruneStaleFootprints(serverState));
                     // Whatever was locally undoable no longer applies to
                     // the tile indices in this freshly-pulled state.
                     setLastAction(null);

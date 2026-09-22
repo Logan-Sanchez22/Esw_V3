@@ -147,6 +147,33 @@ export function resolvePlacement(
   return null;
 }
 
+/**
+ * Clears any `anchorIndex` pointer that no longer corresponds to a real
+ * footprint cell — the only way that can happen is a catalog item's
+ * footprint shrinking or disappearing after tiles were already saved under
+ * its old, larger shape (e.g. Bench going from 2x1 back to 1x1). Without
+ * this, a tile like that stays permanently and invisibly "occupied"
+ * (isTileEmpty checks anchorIndex, not just item) even though nothing
+ * placed it there and nothing would ever clear it on its own — the anchor's
+ * own item is untouched, so ordinary remove/move never revisits it. Safe to
+ * run on every load: a no-op whenever nothing is actually stale.
+ */
+export function pruneStaleFootprints(state: GardenDomainState): GardenDomainState {
+  let changed = false;
+  const tiles = state.tiles.map((tile, index) => {
+    if (tile.anchorIndex === undefined) return tile;
+    const anchorItemId = state.tiles[tile.anchorIndex]?.item;
+    const anchorItem = anchorItemId ? getCatalogItem(anchorItemId) : undefined;
+    const cells = anchorItem
+      ? getFootprintCells(tile.anchorIndex, getItemFootprint(anchorItem).width, getItemFootprint(anchorItem).height)
+      : null;
+    if (anchorItemId && cells?.includes(index)) return tile;
+    changed = true;
+    return { ...tile, anchorIndex: undefined };
+  });
+  return changed ? { ...state, tiles } : state;
+}
+
 /** Clears every cell of a footprint anchored at `anchorIndex` back to empty. */
 function clearFootprint(tiles: TileState[], anchorIndex: number, width: number, height: number): void {
   const cells = getFootprintCells(anchorIndex, width, height) ?? [anchorIndex];
@@ -425,11 +452,7 @@ export const CATALOG: CatalogItem[] = [
   { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, unlockThreshold: 40, category: 'nature' },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },
-  // The one item using a multi-tile footprint so far (see
-  // CatalogItem.footprint) — a bench reads naturally as wider than a single
-  // tile, and "structures" is otherwise a one-item category, a reasonable
-  // place to prove out real tile-reservation cost for something premium.
-  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures', footprint: { width: 2, height: 1 } },
+  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50, category: 'structures' },
   // Top-down only for now — no honest iso counterpart in the 41 sprites
   // extracted from misc.png so far (lily pads/grass tufts aren't part of
   // that sheet's subject matter). Same asymmetry the iso side already has
