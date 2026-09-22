@@ -1,5 +1,5 @@
 import { View, Text } from 'react-native'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import { Link } from "expo-router";
 import {
@@ -19,11 +19,13 @@ import { getDecorationSprite } from '@/lib/decorations';
 import { pickVariant } from '@/lib/variantPick';
 import {
     CATALOG,
+    DEFAULT_CATALOG_ITEM_ID,
     GRID_SIZE,
     GROUND_CATALOG,
     REMOVE_TOOL_ID,
     getCatalogItem,
     getPlacementBlock,
+    isItemUnlocked,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
@@ -89,22 +91,6 @@ function getGroundSpriteKey(groundId: string, tileIndex: number): keyof typeof i
     return GROUND_SPRITE[groundId] ?? 'grassFlat';
 }
 
-// Not every catalog entry has iso art (lilyPad/grassTuft are top-down only) —
-// filter to what has an isometric sprite in the shared registry. Plus a
-// "Remove" tool at the front for clearing a tile.
-const PICKER_ITEMS: PickerEntry[] = [
-    { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-    ...CATALOG.filter((item) => getDecorationSprite(item.id, 'isometric')).map((item) => {
-        const sprite = getDecorationSprite(item.id, 'isometric')!;
-        return {
-            id: item.id,
-            label: item.label,
-            cost: item.cost,
-            icon: <AtlasSprite atlas={sprite.atlas} sprite={sprite.key} size={PICKER_ICON_SIZE} />,
-        };
-    }),
-];
-
 const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
     id: ground.id,
     label: ground.label,
@@ -121,7 +107,7 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.map((ground) => ({
 const Garden = () => {
     const { state, placeItem, removeItem, paintGround } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
-    const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
+    const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_CATALOG[0].id);
     const { message, showMessage } = useStatusMessage();
 
@@ -152,11 +138,33 @@ const Garden = () => {
         if (flashTimer.current) clearTimeout(flashTimer.current);
     }, []);
 
+    // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
+    // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
+    // lifetime earnings actually change, not on every render.
+    const pickerItems: PickerEntry[] = useMemo(
+        () => [
+            { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
+            ...CATALOG.filter((item) => getDecorationSprite(item.id, 'isometric')).map((item) => {
+                const sprite = getDecorationSprite(item.id, 'isometric')!;
+                const locked = !isItemUnlocked(state, item);
+                return {
+                    id: item.id,
+                    label: item.label,
+                    cost: item.cost,
+                    icon: <AtlasSprite atlas={sprite.atlas} sprite={sprite.key} size={PICKER_ICON_SIZE} />,
+                    locked,
+                    lockedHint: locked ? `Unlocks at ${item.unlockThreshold} pts earned` : undefined,
+                };
+            }),
+        ],
+        [state.totalPointsEarned]
+    );
+
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
                 <Text className="text-xl font-bold text-success mb-2">Isometric Garden</Text>
-                <Text className="text-mutedForeground mb-2">{state.points} pts</Text>
+                <Text className="text-mutedForeground mb-2">{state.points} pts · {state.totalPointsEarned} earned</Text>
 
                 <Link href="/quest-page" style={{ color: '#6EE7B7', textDecorationLine: 'underline' }}>
                     Earn more points from Quests →
@@ -169,7 +177,7 @@ const Garden = () => {
 
             {mode === 'decorate' ? (
                 <ItemPicker
-                    items={PICKER_ITEMS}
+                    items={pickerItems}
                     selectedId={selectedItemId}
                     onSelect={setSelectedItemId}
                     points={state.points}
@@ -219,6 +227,9 @@ const Garden = () => {
                             flashInvalid(index);
                         } else if (block === 'non-placeable-terrain') {
                             showMessage("Can't place on water");
+                            flashInvalid(index);
+                        } else if (block === 'locked') {
+                            showMessage('Not unlocked yet');
                             flashInvalid(index);
                         } else if (block === 'insufficient-points') {
                             showMessage('Not enough points');

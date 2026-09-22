@@ -27,6 +27,7 @@ function isValidGardenState(value: unknown): value is GardenDomainState {
   const state = value as GardenDomainState;
   return (
     typeof state.points === 'number' &&
+    typeof state.totalPointsEarned === 'number' &&
     Array.isArray(state.tiles) &&
     state.tiles.length === GRID_SIZE * GRID_SIZE &&
     state.tiles.every(
@@ -45,7 +46,11 @@ export async function GET(request: Request) {
   }
 
   const row = rows[0];
-  return Response.json({ points: row.points, tiles: row.tiles } satisfies GardenDomainState);
+  return Response.json({
+    points: row.points,
+    totalPointsEarned: row.totalPointsEarned,
+    tiles: row.tiles,
+  } satisfies GardenDomainState);
 }
 
 export async function PUT(request: Request) {
@@ -57,12 +62,19 @@ export async function PUT(request: Request) {
     return Response.json({ error: 'Invalid garden state' }, { status: 400 });
   }
 
+  const values = {
+    points: body.points,
+    totalPointsEarned: body.totalPointsEarned,
+    tiles: body.tiles,
+    updatedAt: new Date(),
+  };
+
   await db
     .insert(gardens)
-    .values({ userId, points: body.points, tiles: body.tiles, updatedAt: new Date() })
+    .values({ userId, ...values })
     .onConflictDoUpdate({
       target: gardens.userId,
-      set: { points: body.points, tiles: body.tiles, updatedAt: new Date() },
+      set: values,
     });
 
   return Response.json({ ok: true });

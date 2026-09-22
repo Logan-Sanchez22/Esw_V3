@@ -22,15 +22,19 @@ import {
 const PUSH_DEBOUNCE_MS = 1000;
 
 const STORAGE_KEY = 'gryph-gardens:garden-state';
-// Bumped when TileState gained `ground` (was a bare PlacedItemId[] before) —
-// see migrateFromUnversioned below.
-const CURRENT_VERSION = 2;
+// v2: TileState gained `ground` (was a bare PlacedItemId[] before), see
+// migrateFromUnversioned. v3: GardenDomainState gained `totalPointsEarned`
+// (for the catalog-unlock progression hook), see migrateFromV2.
+const CURRENT_VERSION = 3;
 
 type PersistedGardenBlob = { version: number; state: GardenDomainState };
 
-function isValidGardenState(value: unknown): value is GardenDomainState {
+/** The v2 shape — points + grounded tiles, no totalPointsEarned yet. */
+type V2GardenState = { points: number; tiles: TileState[] };
+
+function isValidV2GardenState(value: unknown): value is V2GardenState {
     if (!value || typeof value !== 'object') return false;
-    const state = value as GardenDomainState;
+    const state = value as V2GardenState;
     return (
         typeof state.points === 'number' &&
         Array.isArray(state.tiles) &&
@@ -41,8 +45,24 @@ function isValidGardenState(value: unknown): value is GardenDomainState {
     );
 }
 
+function isValidGardenState(value: unknown): value is GardenDomainState {
+    return isValidV2GardenState(value) && typeof (value as GardenDomainState).totalPointsEarned === 'number';
+}
+
+/**
+ * Version-2 saves had no totalPointsEarned. There's no way to recover true
+ * lifetime earnings from history, so this approximates it as the current
+ * balance — undercounts for anyone who already spent points before this
+ * field existed (they'll see a threshold item stay locked a little longer
+ * than someone starting fresh with the same spend pattern would), but never
+ * overcounts, and self-corrects as soon as more points are earned.
+ */
+function migrateFromV2(value: V2GardenState): GardenDomainState {
+    return { ...value, totalPointsEarned: value.points };
+}
+
 /** Version-1 saves were a bare `{ points, tiles: PlacedItemId[] }` — one id per tile, no ground. */
-function migrateFromUnversioned(value: unknown): GardenDomainState | null {
+function migrateFromUnversioned(value: unknown): V2GardenState | null {
     if (!value || typeof value !== 'object') return null;
     const legacy = value as { points?: unknown; tiles?: unknown };
     if (typeof legacy.points !== 'number' || !Array.isArray(legacy.tiles)) return null;
@@ -102,8 +122,18 @@ export function GardenDomainProvider({ children }: { children: ReactNode }) {
                     return;
                 }
 
-                const migrated = migrateFromUnversioned(parsed);
-                if (migrated) setState(migrated);
+                if (
+                    parsed &&
+                    typeof parsed === 'object' &&
+                    (parsed as { version?: number }).version === 2 &&
+                    isValidV2GardenState((parsed as { state?: unknown }).state)
+                ) {
+                    setState(migrateFromV2((parsed as { state: V2GardenState }).state));
+                    return;
+                }
+
+                const migratedFromV1 = migrateFromUnversioned(parsed);
+                if (migratedFromV1) setState(migrateFromV2(migratedFromV1));
             })
             .catch(() => {
                 // Corrupt or unavailable storage — keep the empty garden already in state.

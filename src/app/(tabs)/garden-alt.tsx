@@ -1,5 +1,5 @@
 import { View, Text, TouchableOpacity } from 'react-native'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";
 import {
     SafeAreaView as RNSafeAreaView,
@@ -17,11 +17,13 @@ import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
 import {
     CATALOG,
+    DEFAULT_CATALOG_ITEM_ID,
     GRID_SIZE,
     GROUND_CATALOG,
     REMOVE_TOOL_ID,
     getCatalogItem,
     getPlacementBlock,
+    isItemUnlocked,
 } from '@/lib/garden-domain';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { useStatusMessage } from '@/lib/useStatusMessage';
@@ -48,19 +50,6 @@ const GROUND_SPRITE: Record<string, keyof typeof topDownGroundAtlas.sprites> = {
     water: 'water',
 };
 
-const PICKER_ITEMS: PickerEntry[] = [
-    { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-    ...CATALOG.filter((item) => getDecorationSprite(item.id, 'topDown')).map((item) => {
-        const deco = getDecorationSprite(item.id, 'topDown')!;
-        return {
-            id: item.id,
-            label: item.label,
-            cost: item.cost,
-            icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
-        };
-    }),
-];
-
 const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => ground.id in GROUND_SPRITE).map(
     (ground) => ({
         id: ground.id,
@@ -80,7 +69,7 @@ const GROUND_PICKER_ITEMS: PickerEntry[] = GROUND_CATALOG.filter((ground) => gro
 const GardenAlt = () => {
     const { state, placeItem, removeItem, paintGround } = useGardenDomain();
     const [mode, setMode] = useState<Mode>('decorate');
-    const [selectedItemId, setSelectedItemId] = useState<string>(CATALOG[0].id);
+    const [selectedItemId, setSelectedItemId] = useState<string>(DEFAULT_CATALOG_ITEM_ID);
     const [selectedGroundId, setSelectedGroundId] = useState<string>(GROUND_PICKER_ITEMS[0].id);
     const { message, showMessage } = useStatusMessage();
     const insets = useSafeAreaInsets();
@@ -109,11 +98,33 @@ const GardenAlt = () => {
         if (flashTimer.current) clearTimeout(flashTimer.current);
     }, []);
 
+    // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
+    // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
+    // lifetime earnings actually change, not on every render.
+    const pickerItems: PickerEntry[] = useMemo(
+        () => [
+            { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
+            ...CATALOG.filter((item) => getDecorationSprite(item.id, 'topDown')).map((item) => {
+                const deco = getDecorationSprite(item.id, 'topDown')!;
+                const locked = !isItemUnlocked(state, item);
+                return {
+                    id: item.id,
+                    label: item.label,
+                    cost: item.cost,
+                    icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
+                    locked,
+                    lockedHint: locked ? `Unlocks at ${item.unlockThreshold} pts earned` : undefined,
+                };
+            }),
+        ],
+        [state.totalPointsEarned]
+    );
+
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
             <View className="p-5">
                 <Text className="text-xl font-bold text-success mb-2">TopDown Garden</Text>
-                <Text className="text-mutedForeground">{state.points} pts</Text>
+                <Text className="text-mutedForeground">{state.points} pts · {state.totalPointsEarned} earned</Text>
                 {message && <Text className="text-warning mt-1">{message}</Text>}
             </View>
 
@@ -121,7 +132,7 @@ const GardenAlt = () => {
 
             {mode === 'decorate' ? (
                 <ItemPicker
-                    items={PICKER_ITEMS}
+                    items={pickerItems}
                     selectedId={selectedItemId}
                     onSelect={setSelectedItemId}
                     points={state.points}
@@ -181,6 +192,9 @@ const GardenAlt = () => {
                                         flashInvalid(i);
                                     } else if (block === 'non-placeable-terrain') {
                                         showMessage("Can't place on water");
+                                        flashInvalid(i);
+                                    } else if (block === 'locked') {
+                                        showMessage('Not unlocked yet');
                                         flashInvalid(i);
                                     } else if (block === 'insufficient-points') {
                                         showMessage('Not enough points');

@@ -13,6 +13,12 @@ export type PickerEntry = {
     label: string;
     cost: number;
     icon: ReactNode;
+    /** Not yet unlocked (see CatalogItem.unlockThreshold) — distinct from
+     * "can't currently afford it": shows a lock badge instead of the cost,
+     * and can't be selected regardless of points on hand. */
+    locked?: boolean;
+    /** Shown under the label when locked, e.g. "Unlocks at 20 pts earned". */
+    lockedHint?: string;
 };
 
 type Props = {
@@ -37,11 +43,12 @@ function PickerItemButton({
 }) {
     const scale = useSharedValue(1);
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+    const locked = item.locked ?? false;
 
     return (
         <Animated.View style={animatedStyle}>
             <TouchableOpacity
-                disabled={!affordable}
+                disabled={!affordable || locked}
                 onPress={onPress}
                 onPressIn={() => {
                     scale.value = withTiming(0.92, { duration: 80 });
@@ -56,7 +63,7 @@ function PickerItemButton({
                     borderWidth: selected ? 2 : 1,
                     borderColor: selected ? '#facc15' : 'rgba(255,255,255,0.15)',
                     backgroundColor: 'rgba(0,0,0,0.25)',
-                    opacity: affordable ? 1 : 0.4,
+                    opacity: locked ? 0.5 : affordable ? 1 : 0.4,
                     paddingVertical: 8,
                 }}
             >
@@ -64,9 +71,15 @@ function PickerItemButton({
                 <Text numberOfLines={1} style={{ fontSize: 10, color: 'white', marginTop: 4 }}>
                     {item.label}
                 </Text>
-                <Text style={{ fontSize: 10, color: '#facc15', marginTop: 2 }}>
-                    {item.cost > 0 ? `${item.cost} pts` : 'Free'}
-                </Text>
+                {locked ? (
+                    <Text numberOfLines={1} style={{ fontSize: 9, color: '#9ca3af', marginTop: 2 }}>
+                        🔒 {item.lockedHint ?? 'Locked'}
+                    </Text>
+                ) : (
+                    <Text style={{ fontSize: 10, color: '#facc15', marginTop: 2 }}>
+                        {item.cost > 0 ? `${item.cost} pts` : 'Free'}
+                    </Text>
+                )}
             </TouchableOpacity>
         </Animated.View>
     );

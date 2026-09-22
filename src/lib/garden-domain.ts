@@ -26,18 +26,39 @@ export type CatalogItem = {
    * once these are visible on a device.
    */
   visualScale?: number;
+  /**
+   * Total lifetime points *earned* (not current spendable balance) required
+   * before this item can be placed at all — a light progression hook on top
+   * of the quest points-earning loop that already exists, so the garden has
+   * something to unlock over time beyond just "can I currently afford it."
+   * Undefined = always unlocked (every item so far except a couple of
+   * higher-cost ones picked as early milestones).
+   */
+  unlockThreshold?: number;
 };
 
 export type GardenDomainState = {
   points: number;
+  /**
+   * Lifetime points ever earned via addPoints — never decreases when points
+   * are spent via placeItem, unlike `points` itself. Exists solely to drive
+   * CatalogItem.unlockThreshold; nothing else should read it as "currency."
+   */
+  totalPointsEarned: number;
   tiles: TileState[]; // length GRID_SIZE * GRID_SIZE, row-major
 };
 
 export function createEmptyGarden(): GardenDomainState {
   return {
     points: 0,
+    totalPointsEarned: 0,
     tiles: Array.from({ length: GRID_SIZE * GRID_SIZE }, () => ({ ground: DEFAULT_GROUND, item: null })),
   };
+}
+
+/** Undefined threshold means "always unlocked" — true for every item except a few milestone ones. */
+export function isItemUnlocked(state: GardenDomainState, item: CatalogItem): boolean {
+  return item.unlockThreshold === undefined || state.totalPointsEarned >= item.unlockThreshold;
 }
 
 export function canPlace(state: GardenDomainState, index: number, item: CatalogItem): boolean {
@@ -45,6 +66,7 @@ export function canPlace(state: GardenDomainState, index: number, item: CatalogI
   const tile = state.tiles[index];
   if (tile.item !== null) return false;
   if (!isGroundPlaceable(tile.ground)) return false;
+  if (!isItemUnlocked(state, item)) return false;
   return state.points >= item.cost;
 }
 
@@ -56,11 +78,11 @@ export function placeItem(
   if (!canPlace(state, index, item)) return state;
   const tiles = [...state.tiles];
   tiles[index] = { ...tiles[index], item: item.id };
-  return { points: state.points - item.cost, tiles };
+  return { ...state, points: state.points - item.cost, tiles };
 }
 
 export function addPoints(state: GardenDomainState, amount: number): GardenDomainState {
-  return { ...state, points: state.points + amount };
+  return { ...state, points: state.points + amount, totalPointsEarned: state.totalPointsEarned + amount };
 }
 
 /** Clears a tile's planting back to empty. No point refund — placing is a deliberate sink. */
@@ -81,7 +103,7 @@ export function paintGround(state: GardenDomainState, index: number, groundId: s
   return { ...state, tiles };
 }
 
-export type PlacementBlock = 'occupied' | 'non-placeable-terrain' | 'insufficient-points' | null;
+export type PlacementBlock = 'occupied' | 'non-placeable-terrain' | 'locked' | 'insufficient-points' | null;
 
 /** Why a placement would fail, for UI feedback — canPlace() collapses this to a bool. */
 export function getPlacementBlock(
@@ -93,6 +115,7 @@ export function getPlacementBlock(
   const tile = state.tiles[index];
   if (tile.item !== null) return 'occupied';
   if (!isGroundPlaceable(tile.ground)) return 'non-placeable-terrain';
+  if (!isItemUnlocked(state, item)) return 'locked';
   if (state.points < item.cost) return 'insufficient-points';
   return null;
 }
@@ -105,7 +128,11 @@ export function getPlacementBlock(
  * has art in every atlas yet, so a screen may only show a subset of this list.
  */
 export const CATALOG: CatalogItem[] = [
-  { id: 'tree', label: 'Tree', cost: 12, visualScale: 1 },
+  // unlockThreshold picks: quests award ~65 points total (one-time, 5-25
+  // each) — 20 is reachable after a couple of modest quests (an early
+  // motivator), 50 takes most of them (a capstone reward for the priciest
+  // item). Everything else stays unlocked from the start.
+  { id: 'tree', label: 'Tree', cost: 12, visualScale: 1, unlockThreshold: 20 },
   { id: 'treeBare', label: 'Bare Tree', cost: 8, visualScale: 0.9 },
   { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55 },
   { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55 },
@@ -113,7 +140,7 @@ export const CATALOG: CatalogItem[] = [
   { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3 },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5 },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5 },
-  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7 },
+  { id: 'bench', label: 'Bench', cost: 15, visualScale: 0.7, unlockThreshold: 50 },
   // Top-down only for now — no honest iso counterpart in the 41 sprites
   // extracted from misc.png so far (lily pads/grass tufts aren't part of
   // that sheet's subject matter). Same asymmetry the iso side already has
@@ -125,6 +152,11 @@ export const CATALOG: CatalogItem[] = [
 export function getCatalogItem(id: string): CatalogItem | undefined {
   return CATALOG.find((item) => item.id === id);
 }
+
+/** First always-unlocked item — a sensible default picker selection for a
+ * fresh player, since CATALOG[0] itself now carries an unlockThreshold. */
+export const DEFAULT_CATALOG_ITEM_ID: string =
+  CATALOG.find((item) => item.unlockThreshold === undefined)?.id ?? CATALOG[0].id;
 
 /** Sentinel picker selection id for the "clear this tile" tool — not a real catalog item. */
 export const REMOVE_TOOL_ID = '__remove__';
