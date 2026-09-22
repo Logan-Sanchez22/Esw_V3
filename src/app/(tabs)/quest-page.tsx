@@ -5,6 +5,7 @@ import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
 import { Button, Card, EmptyState, ScreenHeader, StatPill } from '@/components/ui';
 import { QUESTS } from '@/lib/quest-domain';
+import { playSound } from '@/lib/sound';
 import { useQuestDomain } from '@/context/quest-domain-store';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { colors, spacing, typography } from '../../../constants/theme';
@@ -82,6 +83,7 @@ const QuestPage = () => {
                                             onPress={() => {
                                                 completeQuest(quest.id);
                                                 addPoints(quest.points);
+                                                playSound('quest');
                                             }}
                                         />
                                     )}

@@ -21,6 +21,7 @@ import { ScreenHeader, StatPill } from '@/components/ui';
 import { UndoPill } from '@/components/UndoPill';
 import { isoBlocksAtlas, IsoBlockKey } from '@/lib/atlases/iso-blocks-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
+import { playSound } from '@/lib/sound';
 import { pickVariant } from '@/lib/variantPick';
 import {
     CATALOG,
@@ -517,6 +518,7 @@ const Garden = () => {
                             } else {
                                 playRemoveFade(index, removedItemId);
                                 removeItem(index);
+                                playSound('remove');
                             }
                             return;
                         }
@@ -657,6 +659,7 @@ const Garden = () => {
                                 placeItem(previewIndex, item);
                                 flyToTile(previewIndex);
                                 playPop(previewIndex);
+                                playSound('place');
                             }
                             setPreviewIndex(null);
                         }}
@@ -687,6 +690,7 @@ const Garden = () => {
                                 moveItem(moveFromIndex, movePreviewIndex);
                                 flyToTile(movePreviewIndex);
                                 playPop(movePreviewIndex);
+                                playSound('place');
                             }
                             cancelMove();
                         }}

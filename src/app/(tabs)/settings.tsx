@@ -1,22 +1,32 @@
 import { Alert, ScrollView, Text, View } from 'react-native'
-import React from 'react'
+import React, { useState } from 'react'
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 import { useAuth, useUser } from "@clerk/expo";
 
 import { Button, ScreenHeader, SectionHeading, StatPill } from '@/components/ui';
+import { ModeToggle } from '@/components/ModeToggle';
 import { completedTodayCount, QUESTS } from '@/lib/quest-domain';
+import { isSoundEnabled, setSoundEnabled } from '@/lib/sound';
 import { useQuestDomain } from '@/context/quest-domain-store';
 import { useGardenDomain } from '@/context/garden-domain-store';
 import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
+const SOUND_OPTIONS = [
+    { id: 'on' as const, label: 'On' },
+    { id: 'off' as const, label: 'Off' },
+];
+
 const Settings = () => {
     const { state: gardenState, resetGarden } = useGardenDomain();
     const { state: questState, resetQuests } = useQuestDomain();
     const { signOut } = useAuth();
     const { user } = useUser();
+    // Mirrors sound.ts's module-level flag in local state purely so this
+    // toggle re-renders — isSoundEnabled() itself isn't reactive.
+    const [soundOn, setSoundOn] = useState(isSoundEnabled());
 
     const confirmReset = (title: string, message: string, onConfirm: () => void) => {
         Alert.alert(title, message, [
@@ -69,6 +79,27 @@ const Settings = () => {
                     }}
                 >
                     Garden and quest progress is saved on this device.
+                </Text>
+
+                <SectionHeading title="Preferences" />
+                <ModeToggle
+                    options={SOUND_OPTIONS}
+                    selected={soundOn ? 'on' : 'off'}
+                    onSelect={(id) => {
+                        setSoundOn(id === 'on');
+                        setSoundEnabled(id === 'on');
+                    }}
+                />
+                <Text
+                    style={{
+                        color: colors.mutedForeground,
+                        fontSize: typography.caption.fontSize,
+                        fontFamily: typography.caption.fontFamily,
+                        marginTop: -spacing[1],
+                        marginBottom: spacing[3],
+                    }}
+                >
+                    Plays a short sound when you place, remove, or complete a quest.
                 </Text>
 
                 <SectionHeading title="Danger Zone" />

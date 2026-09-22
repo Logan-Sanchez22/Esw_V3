@@ -20,6 +20,7 @@ import { ScreenHeader, StatPill } from '@/components/ui';
 import { UndoPill } from '@/components/UndoPill';
 import { topDownGroundAtlas } from '@/lib/atlases/topdown-ground-atlas';
 import { getDecorationSprite } from '@/lib/decorations';
+import { playSound } from '@/lib/sound';
 import { pickVariant } from '@/lib/variantPick';
 import {
     CATALOG,
@@ -530,6 +531,7 @@ const GardenAlt = () => {
                                         } else {
                                             playRemoveFade(i, removedItemId);
                                             removeItem(i);
+                                            playSound('remove');
                                         }
                                         return;
                                     }
@@ -622,6 +624,7 @@ const GardenAlt = () => {
                                 placeItem(previewIndex, item);
                                 flyToTile(previewIndex);
                                 playPop(previewIndex);
+                                playSound('place');
                             }
                             setPreviewIndex(null);
                         }}
@@ -652,6 +655,7 @@ const GardenAlt = () => {
                                 moveItem(moveFromIndex, movePreviewIndex);
                                 flyToTile(movePreviewIndex);
                                 playPop(movePreviewIndex);
+                                playSound('place');
                             }
                             cancelMove();
                         }}

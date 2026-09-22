@@ -8,6 +8,7 @@ import { tokenCache } from "@clerk/expo/token-cache";
 
 import { GardenDomainProvider } from "@/context/garden-domain-store";
 import { QuestDomainProvider } from "@/context/quest-domain-store";
+import { loadSoundPreference } from "@/lib/sound";
 
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
@@ -26,6 +27,12 @@ export default function RootLayout() {
       SplashScreen.hideAsync()
     }
   }, [fontsLoaded])
+
+  // Fire-and-forget — sound defaults to enabled, so nothing needs to wait
+  // on this resolving before the app renders.
+  useEffect(() => {
+    loadSoundPreference();
+  }, [])
 
   if (!fontsLoaded) return null;
 
