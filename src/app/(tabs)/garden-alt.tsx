@@ -8,6 +8,7 @@ import {
 
 import { AmbientParticles } from '@/components/AmbientParticles';
 import { AtlasSprite } from '@/components/AtlasSprite';
+import { CatalogueSheet } from '@/components/CatalogueSheet';
 import { DecorationInfoCard } from '@/components/DecorationInfoCard';
 import { DecorationShadow } from '@/components/DecorationShadow';
 import { ItemPicker, PickerEntry } from '@/components/ItemPicker';
@@ -41,7 +42,7 @@ const SafeAreaView = styled(RNSafeAreaView);
 
 const TILE_SIZE = 48;
 const PICKER_ICON_SIZE = 32;
-const HEADER_HEIGHT = 300; // title (ScreenHeader) + points + mode toggle + category filter + picker + safe area
+const HEADER_HEIGHT = 320; // title (ScreenHeader) + points + mode toggle + "see all" link + category filter + picker + safe area
 
 type Mode = 'decorate' | 'paint' | 'interact';
 
@@ -244,27 +245,55 @@ const GardenAlt = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [visibleCatalogItems]);
 
+    // Shared mapping from a catalog item to a picker card — used both for
+    // the filtered horizontal row and the catalogue sheet's unfiltered
+    // "everything" grid below, so the two never drift apart on how a card
+    // is built.
+    const toPickerEntry = (item: (typeof CATALOG)[number]): PickerEntry => {
+        const deco = getDecorationSprite(item.id, 'topDown')!;
+        const locked = !isItemUnlocked(state, item);
+        return {
+            id: item.id,
+            label: item.label,
+            cost: item.cost,
+            icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
+            locked,
+            lockedHint: locked ? `Unlocks at ${item.unlockThreshold} pts earned` : undefined,
+        };
+    };
+
     // Depends on totalPointsEarned (via isItemUnlocked), so this can't be a
     // module-level constant like GROUND_PICKER_ITEMS — recomputed only when
     // lifetime earnings actually change, not on every render.
     const pickerItems: PickerEntry[] = useMemo(
         () => [
             { id: REMOVE_TOOL_ID, label: 'Remove', cost: 0, icon: <Text style={{ fontSize: 22 }}>🗑️</Text> },
-            ...visibleCatalogItems.map((item) => {
-                const deco = getDecorationSprite(item.id, 'topDown')!;
-                const locked = !isItemUnlocked(state, item);
-                return {
-                    id: item.id,
-                    label: item.label,
-                    cost: item.cost,
-                    icon: <AtlasSprite atlas={deco.atlas} sprite={deco.key} size={PICKER_ICON_SIZE} />,
-                    locked,
-                    lockedHint: locked ? `Unlocks at ${item.unlockThreshold} pts earned` : undefined,
-                };
-            }),
+            ...visibleCatalogItems.map(toPickerEntry),
         ],
         [visibleCatalogItems, state.totalPointsEarned]
     );
+
+    // Every item this screen has art for, regardless of the category filter
+    // — the catalogue sheet's "see everything at once" list.
+    const allDecorationItemsForScreen = useMemo(
+        () => CATALOG.filter((item) => getDecorationSprite(item.id, 'topDown')),
+        []
+    );
+    const cataloguePickerItems: PickerEntry[] = useMemo(
+        () => allDecorationItemsForScreen.map(toPickerEntry),
+        [allDecorationItemsForScreen, state.totalPointsEarned]
+    );
+    const [catalogueOpen, setCatalogueOpen] = useState(false);
+
+    // Selecting from the catalogue can pick an item outside the current
+    // category filter — switch the filter to match so the horizontal row
+    // (and the fallback-selection effect above) stay consistent with what's
+    // actually selected, instead of the row showing nothing highlighted.
+    const handleCatalogueSelect = (id: string) => {
+        const item = allDecorationItemsForScreen.find((entry) => entry.id === id);
+        if (item) setCategoryFilter(item.category);
+        setSelectedItemId(id);
+    };
 
     return (
         <SafeAreaView className={"flex-1 bg-sky"}>
@@ -281,6 +310,14 @@ const GardenAlt = () => {
 
             {mode === 'decorate' ? (
                 <>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', paddingHorizontal: 12 }}>
+                        <Text
+                            onPress={() => setCatalogueOpen(true)}
+                            style={{ color: colors.mutedForeground, fontSize: 12, textDecorationLine: 'underline' }}
+                        >
+                            See all →
+                        </Text>
+                    </View>
                     <ModeToggle
                         options={CATEGORY_FILTER_OPTIONS}
                         selected={categoryFilter}
@@ -292,6 +329,14 @@ const GardenAlt = () => {
                         selectedId={selectedItemId}
                         onSelect={setSelectedItemId}
                         points={state.points}
+                    />
+                    <CatalogueSheet
+                        visible={catalogueOpen}
+                        items={cataloguePickerItems}
+                        selectedId={selectedItemId}
+                        points={state.points}
+                        onSelect={handleCatalogueSelect}
+                        onClose={() => setCatalogueOpen(false)}
                     />
                 </>
             ) : mode === 'paint' ? (
