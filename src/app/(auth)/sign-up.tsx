@@ -1,22 +1,15 @@
 import { useState } from 'react'
-import { Text, TextInput, TouchableOpacity } from 'react-native'
+import { Image, Text } from 'react-native'
 import { Link, router } from "expo-router";
 import { useSignUp } from "@clerk/expo";
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
+import { Button, TextField } from '@/components/ui';
 import { KeyboardAwareForm } from '@/components/KeyboardAwareForm';
+import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
-
-const inputStyle = {
-    borderWidth: 1,
-    borderColor: '#065F46',
-    borderRadius: 8,
-    padding: 12,
-    color: '#ECFDF5',
-    marginBottom: 8,
-} as const;
 
 const emailLooksValid = (value: string) => value.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
@@ -85,38 +78,40 @@ const SignUp = () => {
         return (
             <SafeAreaView className="flex-1 bg-background">
                 <KeyboardAwareForm>
-                    <Text className="text-2xl font-bold text-success mb-2">Check your email</Text>
-                    <Text className="text-mutedForeground mb-6">
+                    <Text
+                        style={{
+                            color: colors.success,
+                            fontSize: typography.display.fontSize,
+                            fontFamily: typography.display.fontFamily,
+                            textAlign: 'center',
+                            marginBottom: spacing[2],
+                        }}
+                    >
+                        Check your email
+                    </Text>
+                    <Text
+                        style={{
+                            color: colors.mutedForeground,
+                            fontSize: typography.body.fontSize,
+                            fontFamily: typography.body.fontFamily,
+                            textAlign: 'center',
+                            marginBottom: spacing[6],
+                        }}
+                    >
                         Enter the verification code we sent to {emailAddress}.
                     </Text>
 
-                    <TextInput
+                    <TextField
                         autoCapitalize="none"
                         keyboardType="number-pad"
                         placeholder="Verification code"
-                        placeholderTextColor="#6EE7B7"
                         value={code}
                         onChangeText={setCode}
-                        style={inputStyle}
+                        error={errors.fields.code?.message}
                     />
-                    {errors.fields.code && <Text className="text-warning mb-2">{errors.fields.code.message}</Text>}
-                    {genericError && <Text className="text-warning mb-3">{genericError}</Text>}
+                    {genericError && <Text style={{ color: colors.warning, marginBottom: spacing[3] }}>{genericError}</Text>}
 
-                    <TouchableOpacity
-                        disabled={submitting || !code}
-                        onPress={onSubmitCode}
-                        style={{
-                            backgroundColor: '#34D399',
-                            borderRadius: 8,
-                            padding: 14,
-                            alignItems: 'center',
-                            opacity: submitting || !code ? 0.5 : 1,
-                        }}
-                    >
-                        <Text style={{ color: '#020F09', fontWeight: '700' }}>
-                            {submitting ? 'Verifying…' : 'Verify'}
-                        </Text>
-                    </TouchableOpacity>
+                    <Button label={submitting ? 'Verifying…' : 'Verify'} onPress={onSubmitCode} disabled={submitting || !code} />
                 </KeyboardAwareForm>
             </SafeAreaView>
         );
@@ -125,65 +120,62 @@ const SignUp = () => {
     return (
         <SafeAreaView className="flex-1 bg-background">
             <KeyboardAwareForm>
-                <Text className="text-2xl font-bold text-success mb-6">Create Account</Text>
+                <Image source={require('@/assets/icons/logo.png')} style={{ width: 64, height: 64, alignSelf: 'center', marginBottom: spacing[4] }} />
+                <Text
+                    style={{
+                        color: colors.success,
+                        fontSize: typography.display.fontSize,
+                        fontFamily: typography.display.fontFamily,
+                        textAlign: 'center',
+                        marginBottom: spacing[6],
+                    }}
+                >
+                    Create Account
+                </Text>
 
-                <TextInput
+                <TextField
                     autoCapitalize="none"
                     keyboardType="email-address"
                     autoComplete="email"
                     placeholder="Email"
-                    placeholderTextColor="#6EE7B7"
                     value={emailAddress}
                     onChangeText={setEmailAddress}
                     onBlur={() => setEmailTouched(true)}
-                    style={inputStyle}
+                    error={
+                        (emailTouched && !emailValid && 'Please enter a valid email address') ||
+                        errors.fields.emailAddress?.message ||
+                        undefined
+                    }
                 />
-                {emailTouched && !emailValid && (
-                    <Text className="text-warning mb-2">Please enter a valid email address</Text>
-                )}
-                {errors.fields.emailAddress && (
-                    <Text className="text-warning mb-2">{errors.fields.emailAddress.message}</Text>
-                )}
 
-                <TextInput
+                <TextField
                     autoCapitalize="none"
                     secureTextEntry
                     autoComplete="password-new"
                     placeholder="Password"
-                    placeholderTextColor="#6EE7B7"
                     value={password}
                     onChangeText={setPassword}
-                    style={inputStyle}
+                    error={errors.fields.password?.message}
                 />
-                {errors.fields.password && (
-                    <Text className="text-warning mb-2">{errors.fields.password.message}</Text>
-                )}
 
-                {genericError && <Text className="text-warning mb-3">{genericError}</Text>}
+                {genericError && <Text style={{ color: colors.warning, marginBottom: spacing[3] }}>{genericError}</Text>}
 
-                <TouchableOpacity
-                    disabled={submitting || !emailAddress || !password || !emailValid}
+                <Button
+                    label={submitting ? 'Creating account…' : 'Create Account'}
                     onPress={onSubmitDetails}
-                    style={{
-                        backgroundColor: '#34D399',
-                        borderRadius: 8,
-                        padding: 14,
-                        alignItems: 'center',
-                        opacity: submitting || !emailAddress || !password || !emailValid ? 0.5 : 1,
-                        marginTop: 8,
-                        marginBottom: 16,
-                    }}
-                >
-                    <Text style={{ color: '#020F09', fontWeight: '700' }}>
-                        {submitting ? 'Creating account…' : 'Create Account'}
-                    </Text>
-                </TouchableOpacity>
+                    disabled={submitting || !emailAddress || !password || !emailValid}
+                />
 
                 <Link
                     href={"/(auth)/sign-in"}
-                    style={{ color: '#6EE7B7', textDecorationLine: 'underline', textAlign: 'center' }}
+                    style={{
+                        color: colors.mutedForeground,
+                        textDecorationLine: 'underline',
+                        textAlign: 'center',
+                        marginTop: spacing[4],
+                    }}
                 >
-                    login to account
+                    Login to account
                 </Link>
             </KeyboardAwareForm>
         </SafeAreaView>
