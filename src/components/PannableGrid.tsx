@@ -18,6 +18,14 @@ type Props = {
     renderTile: (index: number) => ReactNode;
     /** Eases the camera to center on this tile once, when `token` changes — see IsometricGrid's identical prop. */
     flyTo?: { index: number; token: number } | null;
+    /**
+     * A decorative border drawn just outside the tile grid's own bounds, so
+     * the map reads as a bounded plot instead of an unbounded tile canvas
+     * dropped into the background. Purely a background layer positioned via
+     * negative offsets — it never changes mapSize itself, so none of the
+     * pan/zoom clamping math above is affected by it.
+     */
+    edgeFrame?: { width: number; color: string };
 };
 
 /** Centers content along one axis when it's smaller than the viewport (rather than
@@ -39,7 +47,7 @@ function clampAxis(value: number, contentSize: number, viewportSize: number) {
  * garden.tsx and garden-alt.tsx — the pan/zoom/clamping behavior must stay
  * identical between the two art styles, so it lives here once.
  */
-export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile, flyTo }: Props) {
+export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile, flyTo, edgeFrame }: Props) {
     const { width: viewportWidth, height: windowHeight } = useWindowDimensions();
     const viewportHeight = windowHeight - headerHeight;
     const mapSize = gridSize * tileSize;
@@ -127,17 +135,27 @@ export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile,
     return (
         <View style={{ width: viewportWidth, height: viewportHeight, overflow: 'hidden' }}>
             <GestureDetector gesture={composedGesture}>
-                <Animated.View
-                    style={[
-                        { width: mapSize, height: mapSize, flexDirection: 'row', flexWrap: 'wrap' },
-                        mapAnimatedStyle,
-                    ]}
-                >
-                    {Array.from({ length: gridSize * gridSize }).map((_, i) => (
-                        <View key={i} style={{ width: tileSize, height: tileSize }}>
-                            {renderTile(i)}
-                        </View>
-                    ))}
+                <Animated.View style={[{ width: mapSize, height: mapSize }, mapAnimatedStyle]}>
+                    {edgeFrame && (
+                        <View
+                            pointerEvents="none"
+                            style={{
+                                position: 'absolute',
+                                left: -edgeFrame.width,
+                                top: -edgeFrame.width,
+                                width: mapSize + edgeFrame.width * 2,
+                                height: mapSize + edgeFrame.width * 2,
+                                backgroundColor: edgeFrame.color,
+                            }}
+                        />
+                    )}
+                    <View style={{ width: mapSize, height: mapSize, flexDirection: 'row', flexWrap: 'wrap' }}>
+                        {Array.from({ length: gridSize * gridSize }).map((_, i) => (
+                            <View key={i} style={{ width: tileSize, height: tileSize }}>
+                                {renderTile(i)}
+                            </View>
+                        ))}
+                    </View>
                 </Animated.View>
             </GestureDetector>
         </View>

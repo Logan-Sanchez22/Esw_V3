@@ -362,6 +362,7 @@ const GardenAlt = () => {
                     tileSize={TILE_SIZE}
                     headerHeight={HEADER_HEIGHT}
                     flyTo={flyTo}
+                    edgeFrame={{ width: 20, color: colors.tileOutline }}
                     renderTile={(i) => {
                         const tile = state.tiles[i];
                         const isDecoratePreview = i === previewIndex;
