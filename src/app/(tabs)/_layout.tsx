@@ -1,22 +1,32 @@
 import {Redirect, Tabs} from "expo-router"
 import {useAuth} from "@clerk/expo";
 import {tabs} from "../../../constants/data";
+import {useEffect, useState} from "react";
 import {View} from "react-native";
 import clsx from "clsx";
 import {Image} from "react-native"
 import {useSafeAreaInsets} from "react-native-safe-area-context";
 import {colors, components} from "../../../constants/theme";
+import {hasSeenOnboarding} from "@/lib/onboarding-storage";
 
 const tabBar = components.tabBar;
 
 const TabLayout = () => {
     const insets = useSafeAreaInsets();
     const { isLoaded, isSignedIn } = useAuth();
+    // Device-scoped, not account-scoped — checked once here since this is
+    // the layout that owns the app's root path ("/").
+    const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
 
-    // Wait for Clerk to finish reading the token cache before deciding —
-    // deciding early would flash a redirect to sign-in even for an
-    // already-signed-in user on cold start.
-    if (!isLoaded) return null;
+    useEffect(() => {
+        hasSeenOnboarding().then(setOnboardingSeen);
+    }, []);
+
+    // Wait for both checks before deciding — deciding early would flash a
+    // redirect (to onboarding, or to sign-in for an already-signed-in user)
+    // on cold start.
+    if (!isLoaded || onboardingSeen === null) return null;
+    if (!onboardingSeen) return <Redirect href="/onboarding" />;
     if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
 
     const TabIcon = ({focused, icon}: TabIconProps) => {
