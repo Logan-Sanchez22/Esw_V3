@@ -1,3 +1,10 @@
+// ROOT LAYOUT — the top-level component for the entire app. Expo Router
+// (the file-based navigation system this app uses — a file under
+// src/app/ becomes a screen/route automatically, based on its path) always
+// renders this file first, around every other screen. Two jobs happen
+// here: loading custom fonts before anything is shown, and wrapping the
+// whole app in every "Provider" that screens need to read shared state
+// from (Clerk for auth, plus the three Context stores from src/context/).
 import {SplashScreen, Stack} from "expo-router";
 import "@/global.css"
 import {useFonts} from "expo-font";
@@ -11,6 +18,10 @@ import { GardenThemeProvider } from "@/context/garden-theme-store";
 import { QuestDomainProvider } from "@/context/quest-domain-store";
 import { loadSoundPreference } from "@/lib/sound";
 
+// `EXPO_PUBLIC_`-prefixed env vars are the only kind Expo bundles into the
+// actual app code shipped to a user's phone — anything without that prefix
+// (like DATABASE_URL in src/db/client.ts) stays server-only and is never
+// readable from here. See .env.example for the full list this app needs.
 const CLERK_PUBLISHABLE_KEY = process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
 export default function RootLayout() {
@@ -35,6 +46,9 @@ export default function RootLayout() {
     loadSoundPreference();
   }, [])
 
+  // Returning `null` here means React Native just keeps showing the native
+  // splash screen (see SplashScreen.hideAsync() above) — nothing renders
+  // until the fonts this app needs are actually ready to use.
   if (!fontsLoaded) return null;
 
   if (!CLERK_PUBLISHABLE_KEY) {
@@ -43,6 +57,13 @@ export default function RootLayout() {
     );
   }
 
+  // The nesting order of these providers matters only where one depends on
+  // another; here none do, so this is really just "every screen needs auth,
+  // garden state, quest state, and the theme preference all at once."
+  // `<Stack screenOptions={{headerShown: false}} />` is Expo Router's way of
+  // saying "render whichever screen under src/app/ matches the current
+  // route, without its own built-in header bar" (each screen draws its own
+  // header instead).
   return (
       <ClerkProvider publishableKey={CLERK_PUBLISHABLE_KEY} tokenCache={tokenCache}>
         <GestureHandlerRootView style={{ flex: 1 }}>

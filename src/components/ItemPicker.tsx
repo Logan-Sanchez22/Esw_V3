@@ -35,6 +35,10 @@ type Props = {
 
 // Its own component (not inlined in the .map() below) because it needs its
 // own useSharedValue per item — hooks can't be called from inside a callback.
+// (React's "Rules of Hooks": every hook call, like useSharedValue or
+// useState, must happen directly inside a component or another hook — never
+// inside a loop, condition, or a callback like .map()'s — so each card gets
+// its own little component instead, called once per item in the loop.)
 function PickerItemButton({
     item,
     selected,

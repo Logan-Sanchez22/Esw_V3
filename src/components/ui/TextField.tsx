@@ -7,11 +7,23 @@ import { colors, spacing, typography } from '../../../constants/theme';
  * and sign-up.tsx, plus adds an optional label/error slot neither screen had
  * room for cleanly before.
  */
+// `TextInputProps & { ... }` is an "intersection type" — this component's
+// Props are EVERY prop React Native's own TextInput already accepts
+// (placeholder, value, onChangeText, keyboardType, etc — all of
+// TextInputProps), PLUS the two extra ones this wrapper adds. That's what
+// lets every screen using TextField pass normal TextInput props straight
+// through without this file needing to list each one by hand.
 type Props = TextInputProps & {
     label?: string;
     error?: string;
 };
 
+// `{ label, error, style, ...inputProps }` pulls out the three props this
+// component cares about by name, and `...inputProps` ("rest syntax")
+// collects every OTHER prop the caller passed (placeholder, value,
+// onChangeText, and so on) into one object — then `{...inputProps}` below
+// ("spread syntax", the same operator used in reverse) passes all of them
+// straight on to the real TextInput.
 export function TextField({ label, error, style, ...inputProps }: Props) {
     return (
         <View style={{ marginBottom: spacing[2] }}>

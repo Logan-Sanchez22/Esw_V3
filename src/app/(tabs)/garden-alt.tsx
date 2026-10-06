@@ -1,3 +1,15 @@
+// TOP-DOWN GARDEN SCREEN — the other renderer for the same shared garden
+// state (see garden.tsx's top-of-file comment for the full explanation of
+// how these two screens share one source of truth via useGardenDomain()).
+// Most of this file's structure deliberately mirrors garden.tsx line for
+// line (same modes, same preview/confirm flow, same animation approach) —
+// comments already written there for a concept (useMemo, the Mode union
+// type, debounce-free preview state, legacy Animated vs Reanimated) aren't
+// repeated here; only what's genuinely different about this screen gets a
+// new comment below (mainly: tiles here are plain `TouchableOpacity`
+// components directly in a loop, rather than going through a renderGround/
+// renderDecoration "render prop", since PannableGrid's building-block
+// approach is simpler than IsometricGrid's).
 import { Animated, Easing, View, Text, TouchableOpacity } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";

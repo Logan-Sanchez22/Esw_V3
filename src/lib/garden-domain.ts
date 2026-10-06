@@ -1,11 +1,40 @@
+// ============================================================================
+// GARDEN DOMAIN — the "rules engine" for the garden.
+//
+// Beginner orientation: this file has no React, no UI, no screens — just
+// plain TypeScript functions and data. That's deliberate. It answers
+// questions like "can this item go here?" and "what happens to the grid if
+// I place/move/remove this?" without caring whether the answer is drawn as
+// an isometric 3D tile or a flat top-down square. Both src/app/(tabs)/
+// garden.tsx (isometric) and garden-alt.tsx (top-down) import from here and
+// just render whatever this file says the garden currently looks like.
+//
+// This pattern (logic in one plain file, multiple "dumb" screens that just
+// render it) is common in React/React Native apps and makes the logic easy
+// to test and reason about without a UI in the way.
+// ============================================================================
+
 export const GRID_SIZE = 15;
 
+// The garden is a 15x15 grid of tiles, stored as one flat array of length
+// 225 (GRID_SIZE * GRID_SIZE) rather than a 2D array. "Row-major" means the
+// array goes row 0's 15 tiles, then row 1's 15 tiles, and so on. To convert
+// between a flat index and (row, col), see getFootprintCells below — that's
+// the pattern used everywhere in this file.
+
 /** What's placed on a tile — just an id into whichever catalog is active, nothing view-specific. */
+// The `|` here makes this a "union type": a PlacedItemId is EITHER a string
+// (an id like "tree") OR the literal value `null` (meaning empty) — nothing else.
+// TypeScript will flag it as an error if you try to assign anything else to it.
 export type PlacedItemId = string | null;
 
 export const DEFAULT_GROUND = 'grass';
 
 /** A tile now carries both what it's planted with AND what it's made of. */
+// `type X = { ... }` describes the *shape* an object must have — every real
+// TileState object in the app must have a `ground` field (a string) and an
+// `item` field (a PlacedItemId). TypeScript checks this at compile time, so
+// a typo like `tile.grund` gets caught before the app ever runs.
 export type TileState = {
   ground: string;
   /** Set only on a placement's anchor tile (see CatalogItem.footprint) —
@@ -19,6 +48,10 @@ export type TileState = {
    * belongs to. See resolvePlacement. Optional and additive: every
    * existing 1x1 placement never sets this, so old saved gardens (and the
    * jsonb column they sync to) need no migration. */
+  // The `?` after a field name means "optional" — a TileState is still valid
+  // if `anchorIndex` is missing entirely (as opposed to being explicitly set
+  // to some value). TypeScript's type for this field is really
+  // `number | undefined`.
   anchorIndex?: number;
 };
 
@@ -29,6 +62,12 @@ export type TileState = {
  * grass, a lily pad), nature for found/natural objects that aren't quite
  * "planted" (rock, log, mushroom), structures for the one man-made item.
  */
+// A "string literal union" — like the string | null union above, but instead
+// of accepting any string, only these four exact words are valid values.
+// Try typing `category: 'tree'` (singular) anywhere in the app and
+// TypeScript will immediately flag it as an error, since it's not one of
+// the four allowed literals — this catches typos a plain `string` type
+// never would.
 export type CatalogCategory = 'trees' | 'plants' | 'nature' | 'structures';
 
 export type CatalogItem = {
@@ -79,6 +118,11 @@ export type GardenDomainState = {
   tiles: TileState[]; // length GRID_SIZE * GRID_SIZE, row-major
 };
 
+// `Array.from({ length: N }, callback)` builds an N-length array by calling
+// `callback` once per slot — here, 225 fresh { ground: 'grass', item: null }
+// objects. Using a callback (rather than `new Array(225).fill({...})`)
+// matters: `.fill()` would put the *same* object reference in every slot, so
+// editing tile 0 would accidentally edit every other tile too.
 export function createEmptyGarden(): GardenDomainState {
   return {
     points: 0,
@@ -110,6 +154,11 @@ export function getItemFootprint(item: CatalogItem): { width: number; height: nu
  * so this works in row/col space instead of flat index arithmetic.
  */
 export function getFootprintCells(anchorIndex: number, width: number, height: number): number[] | null {
+  // Flat-index <-> row/col conversion, the core trick for a row-major grid:
+  // dividing by GRID_SIZE (and dropping the remainder, via Math.floor) gives
+  // the row; the remainder itself (via %, the modulo operator) gives the
+  // column. E.g. on a 15-wide grid, index 17 is row 1, col 2 (17 / 15 = 1
+  // remainder 2). Going the other way is just `row * GRID_SIZE + col`.
   const anchorRow = Math.floor(anchorIndex / GRID_SIZE);
   const anchorCol = anchorIndex % GRID_SIZE;
   if (anchorCol + width > GRID_SIZE || anchorRow + height > GRID_SIZE) return null;
@@ -202,6 +251,16 @@ export function canPlace(state: GardenDomainState, index: number, item: CatalogI
   return getPlacementBlock(state, index, item) === null;
 }
 
+// Immutability pattern, used throughout this whole file: instead of
+// mutating `state` directly (e.g. `state.tiles[index].item = ...`), every
+// function here builds and returns a brand-new state object, copying
+// whatever didn't change. `[...state.tiles]` makes a shallow copy of the
+// array (the `...` is JavaScript's "spread" syntax); `{ ...state, points: x }`
+// makes a shallow copy of the object with just `points` overridden. This is
+// a deliberate style, not an accident — React (and the Context stores in
+// src/context/) can tell "did this change?" just by comparing old vs new
+// object references, which only works reliably if nothing is ever mutated
+// in place.
 export function placeItem(
   state: GardenDomainState,
   index: number,
@@ -435,6 +494,10 @@ export function undoAction(state: GardenDomainState, action: UndoableAction): Ga
  * (see ITEM_SPRITE in garden.tsx / garden-alt.tsx) — not every id necessarily
  * has art in every atlas yet, so a screen may only show a subset of this list.
  */
+// Just a plain array of objects shaped like CatalogItem (declared above) —
+// adding a new placeable thing to the game is literally adding one more
+// object to this list. `CatalogItem[]` means "an array where every element
+// must match the CatalogItem shape."
 export const CATALOG: CatalogItem[] = [
   // unlockThreshold ladder: 5 checkpoints (20/30/40/50/70) instead of the
   // original 2 (20/50) — now that quests are daily-repeatable (see
@@ -494,6 +557,12 @@ export const REMOVE_TOOL_ID = '__remove__';
  */
 export function pickFallbackSelection(state: GardenDomainState, visibleItems: CatalogItem[]): string {
   const firstUnlocked = visibleItems.find((item) => isItemUnlocked(state, item));
+  // `?.` ("optional chaining") reads `.id` only if the thing on its left
+  // isn't null/undefined — `firstUnlocked?.id` is `undefined` if nothing
+  // was found instead of crashing. `??` ("nullish coalescing") then says
+  // "use the left side unless it's null/undefined, in which case fall back
+  // to the right side" — so this line tries firstUnlocked's id, then the
+  // very first visible item's id, then finally the Remove tool as a last resort.
   return firstUnlocked?.id ?? visibleItems[0]?.id ?? REMOVE_TOOL_ID;
 }
 

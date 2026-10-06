@@ -22,6 +22,13 @@ const SOUND_ENABLED_STORAGE_KEY = 'gryph-gardens:sound-enabled';
 const MUSIC_ENABLED_STORAGE_KEY = 'gryph-gardens:music-enabled';
 const VOLUME_STORAGE_KEY = 'gryph-gardens:volume';
 
+// `let` (not `const`) at the top of a module, outside any function, is a
+// "module-level variable" — there's exactly one of each of these for the
+// whole app, shared by every file that imports from sound.ts. This is
+// different from a React component's own useState, which resets per
+// component instance; these persist for as long as the app is running,
+// which is exactly what's wanted for "is sound currently on" (one true
+// answer for the whole app, not one per screen).
 let soundEnabled = true;
 let musicEnabled = true;
 // Shared by both SFX and music — one "how loud" knob, matching the single
@@ -92,6 +99,12 @@ function applyVolumeToAllPlayers(): void {
  * the library default, set explicitly here since we're touching this call
  * anyway).
  */
+// `async function` means this function can use `await` inside it to pause
+// until a Promise (an "I'll have a result eventually" value — here, reading
+// from on-device storage, which takes a little real time) resolves, without
+// blocking the rest of the app while it waits. `Promise.all([...])` below
+// runs all three storage reads at once instead of one-after-another, since
+// they don't depend on each other.
 export async function loadSoundPreference(): Promise<void> {
     try {
         const [rawSound, rawMusic, rawVolume] = await Promise.all([

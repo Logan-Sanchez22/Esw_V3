@@ -1,5 +1,11 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is and how to
+// read these coordinates. This file covers the TOP-DOWN garden's ground
+// tiles — the top-down screen is a completely separate art set from the
+// isometric one (different sheets, different pixel sizes), which is why
+// there's a whole separate set of atlas files for it below and in the
+// other topdown-*.ts files in this folder.
 /**
  * Ground textures cropped from spring_forest.png. This pack is built around
  * Tiled's Wang-tile autotiling system (see spring_forest_wang_tiles.png), so

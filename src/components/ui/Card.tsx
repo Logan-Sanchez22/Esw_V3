@@ -17,6 +17,11 @@ type Props = {
 export function Card({ children, elevated }: Props) {
     return (
         <View
+            // React Native's `style` prop accepts an array, not just one
+            // object — styles are applied left to right, so a later entry's
+            // properties win. Here that means: always the base card look,
+            // PLUS the shadow styles too, but only when `elevated` is true
+            // (the `undefined` is simply skipped rather than erroring).
             style={[
                 {
                     borderRadius: 12,

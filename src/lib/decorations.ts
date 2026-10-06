@@ -1,3 +1,9 @@
+// Beginner orientation: this file is the lookup table that answers "which
+// picture should I draw for this decoration?" A sprite is one small image
+// cut out of a bigger sheet of art (a "sprite sheet" / "atlas") — see
+// src/lib/atlases/ and src/components/AtlasSprite.tsx for how a sprite's
+// coordinates turn into an actual image on screen.
+
 import { isoDecorationAtlas } from '@/lib/atlases/iso-decoration-atlas';
 import { topDownTreesAtlas } from '@/lib/atlases/topdown-trees-atlas';
 import { topDownProps32Atlas, topDownProps48Atlas } from '@/lib/atlases/topdown-props-atlas';
@@ -75,6 +81,14 @@ export const DECORATION_SPRITES: Record<string, { isometric?: IsoSpriteRef; topD
     },
 };
 
+// "Function overloading": the two lines above with no `{ }` body are just
+// extra type signatures for the SAME function, not separate functions. They
+// tell TypeScript "when called with 'isometric', you'll get an
+// IsoSpriteRef back; when called with 'topDown', you'll get a
+// TopDownSpriteRef back" — more precise than one signature that always
+// returns "IsoSpriteRef or TopDownSpriteRef" and leaves the caller unsure
+// which one they actually got. The real, shared implementation is the third
+// line, with the actual `{ }` body.
 export function getDecorationSprite(id: string, screen: 'isometric'): IsoSpriteRef | undefined;
 export function getDecorationSprite(id: string, screen: 'topDown'): TopDownSpriteRef | undefined;
 export function getDecorationSprite(id: string, screen: 'isometric' | 'topDown') {

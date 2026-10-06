@@ -9,8 +9,19 @@ import { Button, TextField } from '@/components/ui';
 import { KeyboardAwareForm } from '@/components/KeyboardAwareForm';
 import { colors, spacing, typography } from '../../../constants/theme';
 
+// `styled(...)` is NativeWind's bridge that lets a plain React Native
+// component (RNSafeAreaView here) accept Tailwind-style `className` props
+// (see the "bg-background" usage below) instead of only React Native's own
+// `style={{...}}` object syntax. Both appear throughout this file — that's
+// normal, not a mistake; this codebase mixes NativeWind classes for layout
+// with theme.ts's raw values for anything (like exact colors) NativeWind
+// doesn't have a token for.
 const SafeAreaView = styled(RNSafeAreaView);
 
+// Empty string counts as "valid" here on purpose — this function is used
+// to decide whether to show a *red error message*, and an untouched/empty
+// field shouldn't look like an error; the "required" check is separate
+// (see the `disabled={...}` conditions below, which also check `!emailAddress`).
 const emailLooksValid = (value: string) => value.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
 const SignIn = () => {
@@ -30,6 +41,12 @@ const SignIn = () => {
     const submitting = fetchStatus === 'fetching';
     const emailValid = emailLooksValid(emailAddress);
 
+    // Clerk's sign-in is a multi-step state machine, not a single call —
+    // `signIn.status` can land on several different values depending on
+    // what this account requires (password only, email verification,
+    // device trust, etc). This function is the *last* step, called once
+    // Clerk reports the sign-in is fully complete, and it's what actually
+    // navigates into the app.
     const completeSignIn = async () => {
         const { error } = await signIn.finalize({
             navigate: async ({ session }) => {

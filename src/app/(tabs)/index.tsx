@@ -13,6 +13,11 @@ import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
+// This is the Home tab (the file is named index.tsx, which Expo Router
+// treats as the default/first screen of its folder — "/(tabs)" lands here).
+// It's a read-only dashboard: it calls `useGardenDomain()` and
+// `useQuestDomain()` (the Context hooks from src/context/) purely to
+// display a summary, never to change that state itself.
 export default function Home() {
     const { user } = useUser();
     const { state: gardenState } = useGardenDomain();
@@ -20,6 +25,11 @@ export default function Home() {
 
     const completedCount = completedTodayCount(questState);
     const nextQuest = QUESTS.find((quest) => !isCompleted(quest.id));
+    // Chained `?.` (optional chaining, stop and return undefined the moment
+    // anything in the chain is missing) and `??` (nullish coalescing, "use
+    // this value, but only if the thing before it was null/undefined") give
+    // a graceful fallback chain: real first name, else the part of their
+    // email before the @, else the generic "there".
     const firstName = user?.firstName ?? user?.primaryEmailAddress?.emailAddress?.split('@')[0] ?? 'there';
 
     return (

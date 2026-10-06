@@ -1,5 +1,8 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is. Same idea
+// as topdown-props-atlas.ts: two atlases here because the small top-down
+// decorations ship across two differently-sized/shaped sheets.
 /**
  * Starter subset of spring_16x16.png (30 sprites total on the sheet — mushrooms,
  * tulips, flower clusters, rock variants). Extend by opening

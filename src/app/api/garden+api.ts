@@ -1,3 +1,11 @@
+// API ROUTE — a file named "+api.ts" is Expo Router's convention for a
+// server endpoint rather than a screen: it runs only on the server (never
+// bundled into the phone app) and exports one function per HTTP method it
+// handles (`GET`, `PUT` below). garden-domain-store.tsx's sync effects call
+// this route over plain `fetch(...)` as "/api/garden" — this file is the
+// other end of that conversation. This is also why it's safe for this file
+// to import `db` (src/db/client.ts) directly: that file requires a
+// server-only DATABASE_URL that the phone app itself never has access to.
 import { createClerkClient } from '@clerk/backend';
 import { eq } from 'drizzle-orm';
 
@@ -14,6 +22,13 @@ const clerkClient = createClerkClient({
   publishableKey: process.env.EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY,
 });
 
+// Verifies the bearer token the app sent (see garden-domain-store.tsx's
+// `Authorization: Bearer ${token}` header) and returns the signed-in user's
+// id — or, if the token is missing/invalid, returns an actual `Response`
+// object instead. The return type `string | Response` means callers below
+// must check which one they got (`if (userId instanceof Response) return
+// userId;`) before using it as a user id — TypeScript won't let them treat
+// it as a plain string without that check first.
 async function requireUserId(request: Request): Promise<string | Response> {
   const requestState = await clerkClient.authenticateRequest(request);
   if (!requestState.isAuthenticated) {
@@ -22,6 +37,12 @@ async function requireUserId(request: Request): Promise<string | Response> {
   return requestState.toAuth().userId;
 }
 
+// Same type-guard idea as garden-domain-store.tsx's isValidGardenState —
+// this is the server's OWN copy of that check. It can't just trust
+// whatever JSON the client PUTs here: a modified client, a replay, or a
+// future app version with a different shape could send something that
+// doesn't match `GardenDomainState`, and this is the boundary where that
+// gets caught before it's written to the database.
 function isValidGardenState(value: unknown): value is GardenDomainState {
   if (!value || typeof value !== 'object') return false;
   const state = value as GardenDomainState;
@@ -36,6 +57,9 @@ function isValidGardenState(value: unknown): value is GardenDomainState {
   );
 }
 
+// Handles `GET /api/garden` — called once per sign-in (see
+// garden-domain-store.tsx's initial-sync effect) to fetch whatever garden
+// is already saved for this account, if any.
 export async function GET(request: Request) {
   const userId = await requireUserId(request);
   if (userId instanceof Response) return userId;
@@ -53,6 +77,9 @@ export async function GET(request: Request) {
   } satisfies GardenDomainState);
 }
 
+// Handles `PUT /api/garden` — called by garden-domain-store.tsx both for
+// a brand-new account's first save and for every ongoing debounced push
+// after a change.
 export async function PUT(request: Request) {
   const userId = await requireUserId(request);
   if (userId instanceof Response) return userId;
@@ -69,6 +96,11 @@ export async function PUT(request: Request) {
     updatedAt: new Date(),
   };
 
+  // "Upsert": insert a new row, unless one with this userId already exists
+  // (`onConflictDoUpdate`), in which case update that existing row instead.
+  // This is what lets the same endpoint serve both "this account's very
+  // first save" and "just overwrite my existing garden" without the
+  // caller needing to know which case it is.
   await db
     .insert(gardens)
     .values({ userId, ...values })

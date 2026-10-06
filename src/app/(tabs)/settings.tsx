@@ -26,6 +26,10 @@ const DAY_NIGHT_OPTIONS = [
     { id: 'night' as const, label: '🌙 Night' },
 ];
 
+// A tiny local component, defined right here rather than in src/components/ui,
+// since nothing outside this one screen needs it — it exists purely to avoid
+// repeating the same five-property Text style object before every preference
+// row below.
 function PreferenceLabel({ children }: { children: React.ReactNode }) {
     return (
         <Text
@@ -49,6 +53,10 @@ const Settings = () => {
     const { user } = useUser();
     // Mirrors sound.ts's module-level flags/value in local state purely so
     // these controls re-render — the getters below aren't reactive on their own.
+    // (This is exactly why garden-theme-store.tsx exists as a Context store
+    // instead of also being a plain module variable like sound.ts — the
+    // Day/Night toggle needs OTHER already-mounted screens, not just this
+    // one, to react live when it changes.)
     const [soundOn, setSoundOn] = useState(isSoundEnabled());
     const [musicOn, setMusicOn] = useState(isMusicEnabled());
     const [volume, setVolumeState] = useState(getVolume());

@@ -21,6 +21,13 @@ type Props<Key extends string> = {
     style?: any;
 };
 
+// The cropping trick: there's no "draw just this rectangle of an image"
+// API, so instead this renders the FULL sheet image at `atlas.sheetWidth x
+// atlas.sheetHeight` (scaled), but wrapped in a same-sized-as-the-sprite
+// `View` with `overflow: 'hidden'`. Shifting the big image up and left by
+// the sprite's own x/y (as a negative `left`/`top`) lines its target
+// rectangle up with the wrapper's top-left corner — the wrapper then clips
+// away everything outside its bounds, leaving only that one sprite visible.
 export function AtlasSprite<Key extends string>({
                                                     atlas,
                                                     sprite,

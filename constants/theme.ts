@@ -1,3 +1,11 @@
+// DESIGN TOKENS — every color, size, and font this app uses is defined
+// exactly once here and imported everywhere else, instead of individual
+// screens hardcoding their own hex codes/pixel values. That's what makes
+// "nudge this one color/size app-wide" a one-line change instead of a
+// find-and-replace across dozens of files. `as const` on each object below
+// locks every value to its exact literal type (so `colors.primary` is the
+// specific string "#34D399", not just `string`) — mainly useful so a typo'd
+// key (`colors.primray`) is a compile error, not a silent `undefined`.
 export const colors = {
     background: "#020F09",
     foreground: "#ECFDF5",

@@ -11,6 +11,11 @@ export type Quest = {
     description: string;
     points: number;
 };
+// A Quest is just a description of a task — "Recycle something, +5 points."
+// It has no idea whether it's been completed; QuestDomainState (below)
+// tracks that separately. Keeping "what a quest is" and "which quests are
+// done" as two different things is what makes the daily-reset trick below
+// possible without needing a special "reset" step anywhere.
 
 export const QUESTS: Quest[] = [
     {
@@ -65,6 +70,11 @@ export function todayDateKey(): string {
 
 export type QuestDomainState = {
     /**
+     * `Record<string, string>` means "an object used as a lookup table,
+     * where every key and every value is a string" — here, quest id ->
+     * date string, e.g. `{ "recycle": "2026-10-06" }`. It's TypeScript's
+     * way of typing a plain `{}` object used as a dictionary/map.
+     *
      * Maps a quest id to the calendar date it was last completed on. A
      * quest counts as completed only if that date is today — no explicit
      * "reset" step runs anywhere; isQuestCompleted just checks the date

@@ -1,4 +1,22 @@
-
+// ISOMETRIC GRID — the pan/pinch-zoomable isometric view used by garden.tsx.
+// This file is pure rendering/gesture math; it owns no garden data at all
+// (that's why `renderGround`/`renderDecoration` are callback props — see
+// garden.tsx's "render props" comment on how garden.tsx supplies the actual
+// tile content). The two libraries below are what make the pan/zoom
+// possible:
+//   - react-native-gesture-handler (`Gesture.Pan()`, `Gesture.Pinch()`,
+//     `GestureDetector`) recognizes raw touch gestures.
+//   - react-native-reanimated (`useSharedValue`, `useAnimatedStyle`,
+//     `withTiming`) drives the actual on-screen movement. A "shared value"
+//     (`useSharedValue`) is similar to useState, but reading/writing it
+//     doesn't go through React's render cycle at all — updates happen
+//     directly on the UI thread, which is what keeps a drag feeling
+//     instant at 60fps instead of lagging behind the finger.
+//     `useAnimatedStyle` turns shared values into an actual style object
+//     React Native can apply. A function body marked `'worklet'` (see
+//     `clampAxis` below) is JavaScript Reanimated compiles to also run
+//     directly on that same UI thread, which is required for any function
+//     a gesture callback calls synchronously while dragging.
 import { ReactNode, useEffect, useRef, useState } from 'react';
 import { View, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';

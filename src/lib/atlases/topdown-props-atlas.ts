@@ -1,5 +1,11 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is. This file
+// defines two SEPARATE atlases (topDownProps32Atlas and topDownProps48Atlas)
+// because the source art ships as two differently-sized sheets (32px vs
+// 48px sprites) — nothing deeper than that; a decoration just points at
+// whichever one actually has it (see src/lib/decorations.ts).
+
 export type TopDownProp32Key =
   | 'flowerBushOrange'
   | 'flowerBushYellow'

@@ -1,5 +1,9 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is and how to
+// read these coordinates. This file covers the isometric garden's GROUND
+// tiles (grass/soil/water/stone-path), cropped from assets/images/garden/blocks.png.
+
 export type IsoBlockKey =
     | 'grassFlat'
     | 'grassMushroom'

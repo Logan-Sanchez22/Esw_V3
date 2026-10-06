@@ -23,6 +23,16 @@ type Particle = {
     drift: number;
 };
 
+// "Deterministic pseudo-random" — rather than calling Math.random() (which
+// would give a different, unrepeatable layout every render), each
+// particle's properties are derived purely from its own index and `seed`
+// via arbitrary multiply/modulo arithmetic. The exact constants (37, 733,
+// 517, 13...) don't mean anything individually; they're just chosen to be
+// unrelated enough to each other that the results don't visibly repeat in
+// a pattern. The payoff: the same `seed` always produces the exact same
+// scattered-looking particles, which is what lets garden.tsx and
+// garden-alt.tsx each pass a different fixed seed and get two distinct but
+// stable particle layouts.
 function makeParticles(count: number, seed: number): Particle[] {
     return Array.from({ length: count }, (_, i) => {
         const n = seed + i;

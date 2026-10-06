@@ -34,6 +34,13 @@ const VARIANT_STYLES: Record<ButtonVariant, { background: string; borderColor?: 
     },
 };
 
+// `variant = 'primary'` is a default parameter — if the caller doesn't pass
+// a `variant` prop at all, it's 'primary' rather than `undefined`. This is
+// different from Reanimated's hooks below: `useSharedValue` creates a
+// value that can be animated smoothly on the native side (not through
+// React re-renders at all, which is why it's much faster for
+// press-animations like this), and `useAnimatedStyle` turns that value
+// into a style object that stays in sync with it automatically.
 export function Button({ label, onPress, variant = 'primary', disabled, loading }: Props) {
     const scale = useSharedValue(1);
     const animatedStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));

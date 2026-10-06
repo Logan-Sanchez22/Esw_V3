@@ -9,6 +9,9 @@ import { Button, TextField } from '@/components/ui';
 import { KeyboardAwareForm } from '@/components/KeyboardAwareForm';
 import { colors, spacing, typography } from '../../../constants/theme';
 
+// See sign-in.tsx for what `styled(...)` does here and why this file mixes
+// NativeWind `className`s with plain `style={{...}}` objects — same setup,
+// mirrored for the sign-up flow.
 const SafeAreaView = styled(RNSafeAreaView);
 
 const emailLooksValid = (value: string) => value.length === 0 || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
@@ -25,6 +28,8 @@ const SignUp = () => {
     const submitting = fetchStatus === 'fetching';
     const emailValid = emailLooksValid(emailAddress);
 
+    // Same idea as sign-in.tsx's completeSignIn — the final step once
+    // Clerk's multi-step sign-up state machine reports it's done.
     const completeSignUp = async () => {
         const { error } = await signUp.finalize({
             navigate: async ({ session }) => {

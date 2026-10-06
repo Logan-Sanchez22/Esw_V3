@@ -46,6 +46,13 @@ function clampAxis(value: number, contentSize: number, viewportSize: number) {
  * Full-screen pannable + pinch-zoomable tile grid viewport. Shared by both
  * garden.tsx and garden-alt.tsx — the pan/zoom/clamping behavior must stay
  * identical between the two art styles, so it lives here once.
+ *
+ * See IsometricGrid.tsx's top-of-file comment for what useSharedValue,
+ * useAnimatedStyle, worklets, and the Gesture/GestureDetector APIs below
+ * actually are — this component uses the exact same pan/pinch/fly-to
+ * mechanics, just over a simple row/column grid instead of a diamond-tiled
+ * isometric one (so the coordinate math in clampAxis/the gesture handlers
+ * is simpler here than its isometric counterpart).
  */
 export function PannableGrid({ gridSize, tileSize, headerHeight = 0, renderTile, flyTo, edgeFrame }: Props) {
     const { width: viewportWidth, height: windowHeight } = useWindowDimensions();

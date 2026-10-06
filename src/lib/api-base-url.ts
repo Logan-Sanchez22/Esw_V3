@@ -1,6 +1,11 @@
 import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 
+// Beginner orientation: `Platform.OS` is how React Native code checks which
+// platform it's running on ('ios', 'android', or 'web') — used here because
+// phones and web browsers need different URLs to reach this same app's own
+// backend routes (see src/app/api/).
+
 /**
  * Web calls its own API routes with a relative path. Native has no origin of
  * its own, so during development it targets the Metro/Expo dev server itself

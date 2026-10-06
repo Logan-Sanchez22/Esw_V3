@@ -1,3 +1,7 @@
+// For a full walkthrough of the Context + Provider + AsyncStorage pattern
+// used here (createContext, useContext, hydration useEffect), see the
+// top-of-file comment and GardenDomainProvider in garden-domain-store.tsx —
+// this file is the same shape, just simpler (one preference, one effect).
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useState } from 'react';
 

@@ -6,6 +6,12 @@ import { colors } from '../../constants/theme';
  * Small segmented control — "what does tapping a tile do right now."
  * Plain UI like ItemPicker, so shared between both garden screens.
  */
+// `<T extends string>` is a generic type constraint (see
+// sprite-atlas-types.ts for the fuller explanation of generics) — `T` can be
+// any specific string-literal-union type the caller wants (e.g. garden.tsx's
+// `Mode` or `CategoryFilter`), and `ModeOption<T>`/`Props<T>` below then use
+// that same exact type everywhere, so e.g. `onSelect(id)` is guaranteed to
+// get exactly one of that caller's real option ids, not just any string.
 export type ModeOption<T extends string> = {
     id: T;
     label: string;

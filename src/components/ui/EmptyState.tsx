@@ -9,6 +9,11 @@ import { Button } from './Button';
  * activity, etc. Nothing in the app used this before; screens just rendered
  * an empty or all-dimmed list, which reads as broken rather than complete.
  */
+// `ReactNode` is the type for "anything React can render" — a string, a
+// number, a JSX element, null, an array of those, etc. It's the right type
+// whenever a prop is "some arbitrary piece of UI the caller provides" (like
+// `icon` here, which callers pass as a `<Text>` with an emoji) rather than
+// a specific value.
 type Props = {
     icon: ReactNode;
     title: string;

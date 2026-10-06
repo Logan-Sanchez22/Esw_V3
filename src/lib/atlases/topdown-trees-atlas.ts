@@ -1,5 +1,7 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is. The
+// top-down garden's tree sprites, cropped from their own dedicated sheet.
 export type TopDownTreeKey = 'treeCherryRed' | 'treeCherryPink' | 'treeTeal';
 
 export const topDownTreesAtlas: SpriteAtlas<TopDownTreeKey> = {

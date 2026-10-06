@@ -1,3 +1,16 @@
+// ISOMETRIC GARDEN SCREEN — one of the two screens that render the garden
+// (garden-alt.tsx is the other, top-down view). Both read/write the exact
+// same shared state via `useGardenDomain()` (src/context/garden-domain-store.tsx)
+// — this file is "pure rendering + local UI state" on top of that: which
+// mode is active, which tile is showing a preview ghost, which animation is
+// mid-flight, etc. None of the `useState` calls below touch the actual
+// garden data; they only decide what this one screen currently shows.
+// `useMemo(fn, deps)`, used throughout this file, is like useEffect's
+// dependency array but for a *value* instead of a side effect: it
+// re-computes `fn()` only when something in `deps` changes, and reuses the
+// previous result otherwise — a performance tool for expensive
+// computations (like scanning all 225 tiles below), not a correctness
+// requirement.
 import { Animated, Easing, View, Text } from 'react-native'
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { styled } from "nativewind";
@@ -70,6 +83,11 @@ const PREVIEW_HIGHLIGHT_COLOR = colors.highlight;
 
 const PICKER_ICON_SIZE = 32;
 
+// A "string literal union" (see garden-domain.ts's CatalogCategory comment
+// for the general idea) — `mode` can only ever be one of these three exact
+// strings, and TypeScript checks every comparison against it (e.g. `mode
+// === 'decorate'`) at compile time, catching a typo'd mode name immediately
+// instead of it silently never matching at runtime.
 type Mode = 'decorate' | 'paint' | 'interact';
 
 const MODE_OPTIONS = [
@@ -542,6 +560,15 @@ const Garden = () => {
                     dimIndices={dimIndices}
                     dimColor="#000000"
                     flyTo={flyTo}
+                    // One handler covering all three modes — it branches on
+                    // `mode` first, then within 'decorate' branches again on
+                    // whether the Remove tool or a real catalog item is
+                    // selected. Every branch that *would* place/paint/move
+                    // something instead only sets a "preview" state (e.g.
+                    // `setPreviewIndex`) — the actual domain call
+                    // (`placeItem`, `paintFormation`, `moveItem`) only
+                    // happens later, from the PlacementConfirmBar's
+                    // onConfirm below, once the user explicitly confirms.
                     onTilePress={(index) => {
                         if (mode === 'paint') {
                             if (selectedFormation) {
@@ -624,6 +651,14 @@ const Garden = () => {
                             setPreviewIndex(index);
                         }
                     }}
+                    // `renderGround` and `renderDecoration` are "render
+                    // props" — instead of IsometricGrid hardcoding what each
+                    // tile looks like, it accepts a function from its parent
+                    // that returns JSX for a given tile index, and calls it
+                    // once per tile. This is how the exact same grid
+                    // component can be reused for both the ground layer and
+                    // the decoration layer here, without IsometricGrid
+                    // itself needing to know anything about sprites or ghosts.
                     renderGround={(index) => (
                         <View>
                             <AtlasSprite

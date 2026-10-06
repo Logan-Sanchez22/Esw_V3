@@ -1,5 +1,9 @@
 import type { SpriteAtlas } from '@/lib/sprite-atlas-types';
 
+// See src/lib/sprite-atlas-types.ts for what a "sprite atlas" is and how to
+// read these coordinates. This file covers the isometric garden's
+// DECORATIONS (trees, bushes, rocks, flowers, furniture — everything you
+// place on a tile, as opposed to the ground tile itself).
 /**
  * Extracted from misc.png against the labeled reference image
  * (assets/images/measured/misc_labeled.png). Coordinates here were found by

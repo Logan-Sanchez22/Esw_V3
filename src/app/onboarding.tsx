@@ -9,6 +9,10 @@ import { colors, spacing, typography } from '../../constants/theme';
 
 const { width } = Dimensions.get('window');
 
+// `as const` below locks this array down to its exact literal values at the
+// type level (so `slide.title` is the specific string "Grow a Real Garden",
+// not just `string`) — not load-bearing here, just a small safety net
+// against a typo silently becoming "a valid string" instead of an error.
 const SLIDES = [
     {
         emoji: '🌱',
@@ -29,6 +33,13 @@ const SLIDES = [
 
 export default function Onboarding() {
     const [index, setIndex] = useState(0);
+    // `useRef<ScrollView>(null)` here is a different use of useRef than the
+    // "remember a value across renders" one explained in
+    // garden-domain-store.tsx — this is React Native's way of getting an
+    // imperative handle to an actual native component instance (so
+    // `scrollRef.current?.scrollTo(...)` below can tell the ScrollView to
+    // jump to a position), the same idea as `document.getElementById(...)`
+    // would be on the web.
     const scrollRef = useRef<ScrollView>(null);
     const isLast = index === SLIDES.length - 1;
 

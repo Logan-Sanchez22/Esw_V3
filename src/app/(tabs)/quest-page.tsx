@@ -12,6 +12,15 @@ import { colors, spacing, typography } from '../../../constants/theme';
 
 const SafeAreaView = styled(RNSafeAreaView);
 
+// The Quests tab — much simpler than the two garden screens: it just lists
+// every quest from QUESTS (src/lib/quest-domain.ts) and lets the user
+// complete whichever ones aren't done yet today. Completing a quest touches
+// TWO separate stores at once: `completeQuest` (quest-domain-store.tsx)
+// marks that specific quest done, while `addPoints` (garden-domain-store.tsx)
+// is what actually gives the reward — they're deliberately two different
+// Context stores (quests vs. the garden), so finishing a quest here is
+// really "tell the quest store it's done, AND separately tell the garden
+// store to add points."
 const QuestPage = () => {
     const { isCompleted, completeQuest } = useQuestDomain();
     const { state: gardenState, addPoints } = useGardenDomain();

@@ -1,3 +1,9 @@
+// "(tabs)" is another Expo Router route group (see (auth)/_layout.tsx's
+// comment) — every screen file inside src/app/(tabs)/ automatically becomes
+// one of the bottom tab bar's tabs, listed in constants/data.ts's `tabs`
+// array below. This layout is also where the app decides, on every cold
+// start, whether to actually show the tabs at all, or redirect to
+// onboarding / sign-in first.
 import {Redirect, Tabs} from "expo-router"
 import {useAuth} from "@clerk/expo";
 import {tabs} from "../../../constants/data";
@@ -24,6 +30,11 @@ const TabLayout = () => {
     // Wait for both checks before deciding — deciding early would flash a
     // redirect (to onboarding, or to sign-in for an already-signed-in user)
     // on cold start.
+    // `<Redirect href="..." />` is Expo Router's component form of
+    // navigation — rendering it (instead of calling a function) tells the
+    // router "immediately replace the current screen with this route."
+    // Returning one of these from a layout, before the actual <Tabs>, is
+    // how this file gatekeeps access to the whole tab bar.
     if (!isLoaded || onboardingSeen === null) return null;
     if (!onboardingSeen) return <Redirect href="/onboarding" />;
     if (!isSignedIn) return <Redirect href="/(auth)/sign-in" />;
@@ -38,6 +49,11 @@ const TabLayout = () => {
         );
     };
 
+    // `<Tabs>` is Expo Router's bottom-tab-bar navigator; each `<Tabs.Screen
+    // name="...">` below (generated from constants/data.ts's `tabs` list)
+    // points at a same-named file in this folder (so name="garden" renders
+    // garden.tsx). `screenOptions` here styles the tab bar itself — the
+    // floating pill look, sizing, etc — not any individual screen's content.
     return (
         <Tabs
             screenOptions={{

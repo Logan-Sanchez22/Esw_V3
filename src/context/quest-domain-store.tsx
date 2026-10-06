@@ -1,3 +1,8 @@
+// QUEST DOMAIN STORE — same shape as garden-domain-store.tsx (see that
+// file's top-of-file comment for a full explanation of the Context pattern,
+// AsyncStorage persistence, and the version-migration idea). This one is
+// simpler: quests don't sync to the remote database, only to on-device
+// AsyncStorage, so there's no fetch/token/debounce logic here.
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from 'react';
 
@@ -11,6 +16,10 @@ import {
 
 const STORAGE_KEY = 'gryph-gardens:quest-state';
 
+// Type guard (see garden-domain-store.tsx's isValidV2GardenState comment for
+// what "type guard" / "type predicate" means) — checks that data loaded
+// back from AsyncStorage actually has the shape this version of the app
+// expects before trusting it.
 function isValidQuestState(value: unknown): value is QuestDomainState {
     if (!value || typeof value !== 'object') return false;
     const state = value as QuestDomainState;
@@ -49,12 +58,19 @@ type Store = {
 
 const QuestDomainContext = createContext<Store | null>(null);
 
+// Holds the real quest-completion state and provides it to the rest of the
+// app — see garden-domain-store.tsx's GardenDomainProvider for the fuller
+// walkthrough of this Provider pattern, useState, and useRef.
 export function QuestDomainProvider({ children }: { children: ReactNode }) {
     const [state, setState] = useState<QuestDomainState>(createEmptyQuestState);
     // Same reasoning as GardenDomainProvider: don't let the initial empty
     // state overwrite storage before the hydration read below has run.
     const hydrated = useRef(false);
 
+    // Runs once on mount (empty `[]` dependency array) to load whatever was
+    // saved last time, falling back to the legacy shape if needed — see
+    // garden-domain-store.tsx's hydration effect for the fuller explanation
+    // of useEffect and dependency arrays.
     useEffect(() => {
         AsyncStorage.getItem(STORAGE_KEY)
             .then((raw) => {
