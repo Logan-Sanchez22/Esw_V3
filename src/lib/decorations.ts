@@ -54,6 +54,10 @@ export const DECORATION_SPRITES: Record<string, { isometric?: IsoSpriteRef; topD
         isometric: { atlas: isoDecorationAtlas, key: 'flowerBunchRed' },
         topDown: { atlas: topDownSmall16Atlas, key: 'tulipPink' },
     },
+    goldenFlowers: {
+        isometric: { atlas: isoDecorationAtlas, key: 'flowerBunchGold' },
+        topDown: { atlas: topDownSmall16Atlas, key: 'flowerClusterPinkLily' },
+    },
     mushroom: {
         isometric: { atlas: isoDecorationAtlas, key: 'mushroomRed' },
         topDown: { atlas: topDownSmall16Atlas, key: 'mushroomCluster' },

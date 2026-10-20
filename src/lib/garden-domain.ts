@@ -512,6 +512,7 @@ export const CATALOG: CatalogItem[] = [
   { id: 'bush', label: 'Bush', cost: 5, visualScale: 0.55, category: 'plants' },
   { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55, unlockThreshold: 30, category: 'plants' },
   { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
+  { id: 'goldenFlowers', label: 'Golden Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
   { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, unlockThreshold: 40, category: 'nature' },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },
