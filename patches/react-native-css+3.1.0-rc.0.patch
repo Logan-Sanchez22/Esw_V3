@@ -1,0 +1,42 @@
+diff --git a/node_modules/react-native-css/dist/commonjs/components/index.cjs b/node_modules/react-native-css/dist/commonjs/components/index.cjs
+index 23af26c..8e6015e 100644
+--- a/node_modules/react-native-css/dist/commonjs/components/index.cjs
++++ b/node_modules/react-native-css/dist/commonjs/components/index.cjs
+@@ -105,6 +105,9 @@ module.exports = {
+   get ActionSheetIOS() {
+     return require("react-native").ActionSheetIOS;
+   },
++  get AssetRegistry() {
++    return require("react-native").AssetRegistry;
++  },
+   get Alert() {
+     return require("react-native").Alert;
+   },
+diff --git a/node_modules/react-native-css/dist/module/components/index.cjs b/node_modules/react-native-css/dist/module/components/index.cjs
+index 23af26c..8e6015e 100644
+--- a/node_modules/react-native-css/dist/module/components/index.cjs
++++ b/node_modules/react-native-css/dist/module/components/index.cjs
+@@ -105,6 +105,9 @@ module.exports = {
+   get ActionSheetIOS() {
+     return require("react-native").ActionSheetIOS;
+   },
++  get AssetRegistry() {
++    return require("react-native").AssetRegistry;
++  },
+   get Alert() {
+     return require("react-native").Alert;
+   },
+diff --git a/node_modules/react-native-css/src/components/index.cts b/node_modules/react-native-css/src/components/index.cts
+index ead6ff4..585e5e1 100644
+--- a/node_modules/react-native-css/src/components/index.cts
++++ b/node_modules/react-native-css/src/components/index.cts
+@@ -104,6 +104,9 @@ module.exports = {
+   get ActionSheetIOS() {
+     return require("react-native").ActionSheetIOS;
+   },
++  get AssetRegistry() {
++    return require("react-native").AssetRegistry;
++  },
+   get Alert() {
+     return require("react-native").Alert;
+   },
