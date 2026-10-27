@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Image, Text } from 'react-native'
 import { Link, router } from "expo-router";
-import { useSignIn } from "@clerk/expo";
+import { isClerkAPIResponseError, useClerk, useSignIn } from "@clerk/expo";
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
@@ -26,6 +26,7 @@ const emailLooksValid = (value: string) => value.length === 0 || /^[^\s@]+@[^\s@
 
 const SignIn = () => {
     const { signIn, errors, fetchStatus } = useSignIn();
+    const clerk = useClerk();
     const [emailAddress, setEmailAddress] = useState('');
     const [password, setPassword] = useState('');
     const [code, setCode] = useState('');
@@ -37,6 +38,9 @@ const SignIn = () => {
     // no way forward" bug, not just the keyboard issue.
     const [needsDeviceVerification, setNeedsDeviceVerification] = useState(false);
     const [genericError, setGenericError] = useState<string | null>(null);
+    // Shown alongside errors where signing out and starting over is the
+    // only way forward (see handleExistingSession below).
+    const [offerSignOut, setOfferSignOut] = useState(false);
 
     const submitting = fetchStatus === 'fetching';
     const emailValid = emailLooksValid(emailAddress);
@@ -84,16 +88,59 @@ const SignIn = () => {
             ),
         ]);
 
+    // Clerk refuses a new sign-in with `session_exists` when this device
+    // already holds a session. Normally (tabs)/_layout.tsx and
+    // (auth)/_layout.tsx route a signed-in user past this screen, so ending
+    // up here means `useAuth()` reports signed-out while a session exists —
+    // which is what a *pending* session looks like: Clerk treats a session
+    // with an unfinished session task (set up MFA, choose an organization,
+    // reset a compromised password) as signed-out by default.
+    const handleExistingSession = () => {
+        const session = clerk.session;
+        debug(`existing session: status=${session?.status ?? 'none'}, task=${session?.currentTask?.key ?? 'none'}`);
+        if (session?.status === 'active') {
+            router.replace('/');
+            return;
+        }
+        setGenericError(
+            session?.currentTask
+                ? `Your account has an unfinished setup step ("${session.currentTask.key}") that this app doesn't support yet. Finish it or turn it off in the Clerk Dashboard, then sign out and sign in again.`
+                : "You're already signed in on this device, but that session couldn't be resumed. Sign out and try again."
+        );
+        setOfferSignOut(true);
+    };
+
+    const handleSignOut = async () => {
+        await clerk.signOut();
+        setOfferSignOut(false);
+        setGenericError(null);
+        setDebugStage(null);
+    };
+
     const handleSubmit = async () => {
         if (!emailAddress || !password || !emailValid) return;
         setGenericError(null);
+        setOfferSignOut(false);
 
         debug('1/4 calling signIn.password()…');
         try {
             const result = await withTimeout(signIn.password({ emailAddress, password }), 'signIn.password()');
             debug(`2/4 signIn.password() resolved, error=${JSON.stringify(result.error ?? null)}`);
             const { error } = result;
-            if (error) return; // field-specific messages come from `errors` below
+            if (error) {
+                if (isClerkAPIResponseError(error) && error.errors.some((e) => e.code === 'session_exists')) {
+                    handleExistingSession();
+                } else if (!errors.fields.identifier && !errors.fields.password) {
+                    // Field-specific messages render under their inputs via
+                    // `errors` below; anything else would otherwise be silent.
+                    setGenericError(
+                        (isClerkAPIResponseError(error) && (error.errors[0]?.longMessage ?? error.errors[0]?.message)) ||
+                        error.message ||
+                        'Could not sign in.'
+                    );
+                }
+                return;
+            }
 
             debug(`3/4 signIn.status is now: ${signIn.status}`);
             if (signIn.status === 'complete') {
@@ -207,6 +254,7 @@ const SignIn = () => {
                 />
 
                 {genericError && <Text style={{ color: colors.warning, marginBottom: spacing[3] }}>{genericError}</Text>}
+                {offerSignOut && <Button label="Sign out" variant="secondary" onPress={handleSignOut} />}
 
                 <Button
                     label={submitting ? 'Signing in…' : 'Sign In'}
