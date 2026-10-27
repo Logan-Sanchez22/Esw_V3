@@ -62,39 +62,54 @@ const SignIn = () => {
         if (error) setGenericError(error.message ?? 'Could not complete sign-in.');
     };
 
+    // TEMPORARY DEBUG INSTRUMENTATION — remove once the stuck "Signing
+    // in…" issue is diagnosed. Each stage is shown on screen (under the
+    // button) as well as logged, so the result doesn't depend on Metro's
+    // terminal receiving console output. console.warn is used because
+    // warnings are already known to reach the terminal (Clerk's dev-key WARN).
+    // grep: [signin-debug].
+    const [debugStage, setDebugStage] = useState<string | null>(null);
+    const debug = (stage: string) => {
+        setDebugStage(stage);
+        console.warn(`[signin-debug] ${stage}`);
+    };
+
+    // Turns a promise that never settles into a visible error naming the
+    // stage it got stuck on, instead of an indefinite "Signing in…".
+    const withTimeout = <T,>(promise: Promise<T>, stage: string, ms = 20000) =>
+        Promise.race([
+            promise,
+            new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error(`timed out after ${ms / 1000}s waiting for ${stage}`)), ms)
+            ),
+        ]);
+
     const handleSubmit = async () => {
         if (!emailAddress || !password || !emailValid) return;
         setGenericError(null);
 
-        // TEMPORARY DEBUG INSTRUMENTATION — remove once the stuck "Signing
-        // in…" issue is diagnosed. Tags every log so they're easy to find
-        // and grep: [signin-debug].
-        console.log('[signin-debug] calling signIn.password()...');
+        debug('1/4 calling signIn.password()…');
         try {
-            const result = await signIn.password({ emailAddress, password });
-            console.log('[signin-debug] signIn.password() resolved:', JSON.stringify(result));
+            const result = await withTimeout(signIn.password({ emailAddress, password }), 'signIn.password()');
+            debug(`2/4 signIn.password() resolved, error=${JSON.stringify(result.error ?? null)}`);
             const { error } = result;
-            if (error) {
-                console.log('[signin-debug] error returned, stopping here:', JSON.stringify(error));
-                return; // field-specific messages come from `errors` below
-            }
+            if (error) return; // field-specific messages come from `errors` below
 
-            console.log('[signin-debug] signIn.status is now:', signIn.status);
+            debug(`3/4 signIn.status is now: ${signIn.status}`);
             if (signIn.status === 'complete') {
-                console.log('[signin-debug] calling completeSignIn()...');
-                await completeSignIn();
-                console.log('[signin-debug] completeSignIn() returned');
+                await withTimeout(completeSignIn(), 'signIn.finalize()');
+                debug('4/4 completeSignIn() returned');
             } else if (signIn.status === 'needs_client_trust') {
-                console.log('[signin-debug] needs_client_trust — sending email code...');
-                const { error: codeError } = await signIn.mfa.sendEmailCode();
+                const { error: codeError } = await withTimeout(signIn.mfa.sendEmailCode(), 'signIn.mfa.sendEmailCode()');
+                debug(`4/4 sendEmailCode() resolved, error=${JSON.stringify(codeError ?? null)}`);
                 if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
                 else setNeedsDeviceVerification(true);
             } else {
                 setGenericError(`Sign-in needs an additional step (${signIn.status}) not supported here yet.`);
             }
         } catch (err) {
-            console.log('[signin-debug] signIn.password() THREW:', err);
-            setGenericError('Something went wrong — see terminal logs.');
+            debug(`FAILED: ${err instanceof Error ? err.message : String(err)}`);
+            setGenericError(`Sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
         }
     };
 
@@ -198,6 +213,12 @@ const SignIn = () => {
                     onPress={handleSubmit}
                     disabled={submitting || !emailAddress || !password || !emailValid}
                 />
+
+                {debugStage && (
+                    <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: spacing[3] }}>
+                        [signin-debug] {debugStage}
+                    </Text>
+                )}
 
                 <Link
                     href={"/(auth)/sign-up"}
