@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Text, View } from 'react-native';
+import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, ScrollViewInstance, Text, View } from 'react-native';
 import { router } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -39,8 +39,10 @@ export default function Onboarding() {
     // imperative handle to an actual native component instance (so
     // `scrollRef.current?.scrollTo(...)` below can tell the ScrollView to
     // jump to a position), the same idea as `document.getElementById(...)`
-    // would be on the web.
-    const scrollRef = useRef<ScrollView>(null);
+    // would be on the web. `ScrollViewInstance` (not the `ScrollView`
+    // component type itself) is React Native's dedicated type for exactly
+    // this — the actual imperative handle a ref to this component gives you.
+    const scrollRef = useRef<ScrollViewInstance>(null);
     const isLast = index === SLIDES.length - 1;
 
     const finish = async () => {

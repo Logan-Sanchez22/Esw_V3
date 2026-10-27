@@ -18,7 +18,7 @@
 //     directly on that same UI thread, which is required for any function
 //     a gesture callback calls synchronously while dragging.
 import { ReactNode, useEffect, useRef, useState } from 'react';
-import { View, LayoutChangeEvent } from 'react-native';
+import { View, ViewInstance, LayoutChangeEvent } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
     Easing,
@@ -155,7 +155,7 @@ export function IsometricGrid({
     const savedTranslateY = useSharedValue(0);
     const savedScale = useSharedValue(1);
 
-    const containerRef = useRef<View>(null);
+    const containerRef = useRef<ViewInstance>(null);
 
     // Set the initial position AFTER the container is measured.
     useEffect(() => {
