@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Image, Text } from 'react-native'
 import { Link, router } from "expo-router";
-import { useSignUp } from "@clerk/expo";
+import { useClerk, useSignUp } from "@clerk/expo";
 import { styled } from "nativewind";
 import { SafeAreaView as RNSafeAreaView } from "react-native-safe-area-context";
 
@@ -25,6 +25,7 @@ const SignUp = () => {
     const [pendingVerification, setPendingVerification] = useState(false);
     const [genericError, setGenericError] = useState<string | null>(null);
 
+    const clerk = useClerk();
     const submitting = fetchStatus === 'fetching';
     const emailValid = emailLooksValid(emailAddress);
 
@@ -34,7 +35,13 @@ const SignUp = () => {
         const { error } = await signUp.finalize({
             navigate: async ({ session }) => {
                 if (session.currentTask) {
-                    setGenericError('Additional account setup is required (not supported in this app yet).');
+                    // Signed out right away for the same reason as in
+                    // sign-in.tsx's completeSignIn: a leftover pending session
+                    // blocks every later sign-in with `session_exists`.
+                    setGenericError(
+                        `Your account needs an extra setup step ("${session.currentTask.key}") that this app doesn't support yet. Finish it or turn it off in the Clerk Dashboard, then sign in.`
+                    );
+                    await clerk.signOut();
                     return;
                 }
                 router.replace('/(tabs)');

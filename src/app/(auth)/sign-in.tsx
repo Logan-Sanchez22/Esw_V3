@@ -38,9 +38,6 @@ const SignIn = () => {
     // no way forward" bug, not just the keyboard issue.
     const [needsDeviceVerification, setNeedsDeviceVerification] = useState(false);
     const [genericError, setGenericError] = useState<string | null>(null);
-    // Shown alongside errors where signing out and starting over is the
-    // only way forward (see handleExistingSession below).
-    const [offerSignOut, setOfferSignOut] = useState(false);
 
     const submitting = fetchStatus === 'fetching';
     const emailValid = emailLooksValid(emailAddress);
@@ -56,8 +53,14 @@ const SignIn = () => {
             navigate: async ({ session }) => {
                 if (session.currentTask) {
                     // A Clerk Dashboard "Task" (e.g. org selection) is pending —
-                    // this app doesn't have a flow for that yet.
-                    setGenericError('Additional account setup is required (not supported in this app yet).');
+                    // this app doesn't have a flow for that yet. Sign the
+                    // pending session out right away: left on the device, it
+                    // reads as signed-out to useAuth() yet makes Clerk reject
+                    // every later sign-in with `session_exists`.
+                    setGenericError(
+                        `Your account needs an extra setup step ("${session.currentTask.key}") that this app doesn't support yet. Finish it or turn it off in the Clerk Dashboard, then sign in again.`
+                    );
+                    await clerk.signOut();
                     return;
                 }
                 router.replace('/(tabs)');
@@ -66,97 +69,47 @@ const SignIn = () => {
         if (error) setGenericError(error.message ?? 'Could not complete sign-in.');
     };
 
-    // TEMPORARY DEBUG INSTRUMENTATION — remove once the stuck "Signing
-    // in…" issue is diagnosed. Each stage is shown on screen (under the
-    // button) as well as logged, so the result doesn't depend on Metro's
-    // terminal receiving console output. console.warn is used because
-    // warnings are already known to reach the terminal (Clerk's dev-key WARN).
-    // grep: [signin-debug].
-    const [debugStage, setDebugStage] = useState<string | null>(null);
-    const debug = (stage: string) => {
-        setDebugStage(stage);
-        console.warn(`[signin-debug] ${stage}`);
-    };
-
-    // Turns a promise that never settles into a visible error naming the
-    // stage it got stuck on, instead of an indefinite "Signing in…".
-    const withTimeout = <T,>(promise: Promise<T>, stage: string, ms = 20000) =>
-        Promise.race([
-            promise,
-            new Promise<never>((_, reject) =>
-                setTimeout(() => reject(new Error(`timed out after ${ms / 1000}s waiting for ${stage}`)), ms)
-            ),
-        ]);
-
     // Clerk refuses a new sign-in with `session_exists` when this device
-    // already holds a session. Normally (tabs)/_layout.tsx and
-    // (auth)/_layout.tsx route a signed-in user past this screen, so ending
-    // up here means `useAuth()` reports signed-out while a session exists —
-    // which is what a *pending* session looks like: Clerk treats a session
-    // with an unfinished session task (set up MFA, choose an organization,
-    // reset a compromised password) as signed-out by default.
-    const handleExistingSession = () => {
-        const session = clerk.session;
-        debug(`existing session: status=${session?.status ?? 'none'}, task=${session?.currentTask?.key ?? 'none'}`);
-        if (session?.status === 'active') {
+    // still holds a session. (auth)/_layout.tsx already clears unusable
+    // sessions on the way in, so this is a last-resort fallback: sign the
+    // leftover session out and let the user simply tap Sign In again.
+    const clearExistingSession = async () => {
+        if (clerk.session?.status === 'active') {
             router.replace('/');
             return;
         }
-        setGenericError(
-            session?.currentTask
-                ? `Your account has an unfinished setup step ("${session.currentTask.key}") that this app doesn't support yet. Finish it or turn it off in the Clerk Dashboard, then sign out and sign in again.`
-                : "You're already signed in on this device, but that session couldn't be resumed. Sign out and try again."
-        );
-        setOfferSignOut(true);
-    };
-
-    const handleSignOut = async () => {
         await clerk.signOut();
-        setOfferSignOut(false);
-        setGenericError(null);
-        setDebugStage(null);
+        setGenericError('An old sign-in session on this device was cleared — tap Sign In again.');
     };
 
     const handleSubmit = async () => {
         if (!emailAddress || !password || !emailValid) return;
         setGenericError(null);
-        setOfferSignOut(false);
 
-        debug('1/4 calling signIn.password()…');
-        try {
-            const result = await withTimeout(signIn.password({ emailAddress, password }), 'signIn.password()');
-            debug(`2/4 signIn.password() resolved, error=${JSON.stringify(result.error ?? null)}`);
-            const { error } = result;
-            if (error) {
-                if (isClerkAPIResponseError(error) && error.errors.some((e) => e.code === 'session_exists')) {
-                    handleExistingSession();
-                } else if (!errors.fields.identifier && !errors.fields.password) {
-                    // Field-specific messages render under their inputs via
-                    // `errors` below; anything else would otherwise be silent.
-                    setGenericError(
-                        (isClerkAPIResponseError(error) && (error.errors[0]?.longMessage ?? error.errors[0]?.message)) ||
-                        error.message ||
-                        'Could not sign in.'
-                    );
-                }
-                return;
+        const { error } = await signIn.password({ emailAddress, password });
+        if (error) {
+            if (isClerkAPIResponseError(error) && error.errors.some((e) => e.code === 'session_exists')) {
+                await clearExistingSession();
+            } else if (!errors.fields.identifier && !errors.fields.password) {
+                // Field-specific messages render under their inputs via
+                // `errors` below; anything else would otherwise be silent.
+                setGenericError(
+                    (isClerkAPIResponseError(error) && (error.errors[0]?.longMessage ?? error.errors[0]?.message)) ||
+                    error.message ||
+                    'Could not sign in.'
+                );
             }
+            return;
+        }
 
-            debug(`3/4 signIn.status is now: ${signIn.status}`);
-            if (signIn.status === 'complete') {
-                await withTimeout(completeSignIn(), 'signIn.finalize()');
-                debug('4/4 completeSignIn() returned');
-            } else if (signIn.status === 'needs_client_trust') {
-                const { error: codeError } = await withTimeout(signIn.mfa.sendEmailCode(), 'signIn.mfa.sendEmailCode()');
-                debug(`4/4 sendEmailCode() resolved, error=${JSON.stringify(codeError ?? null)}`);
-                if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
-                else setNeedsDeviceVerification(true);
-            } else {
-                setGenericError(`Sign-in needs an additional step (${signIn.status}) not supported here yet.`);
-            }
-        } catch (err) {
-            debug(`FAILED: ${err instanceof Error ? err.message : String(err)}`);
-            setGenericError(`Sign-in failed: ${err instanceof Error ? err.message : String(err)}`);
+        if (signIn.status === 'complete') {
+            await completeSignIn();
+        } else if (signIn.status === 'needs_client_trust') {
+            const { error: codeError } = await signIn.mfa.sendEmailCode();
+            if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
+            else setNeedsDeviceVerification(true);
+        } else {
+            setGenericError(`Sign-in needs an additional step (${signIn.status}) not supported here yet.`);
         }
     };
 
@@ -254,19 +207,12 @@ const SignIn = () => {
                 />
 
                 {genericError && <Text style={{ color: colors.warning, marginBottom: spacing[3] }}>{genericError}</Text>}
-                {offerSignOut && <Button label="Sign out" variant="secondary" onPress={handleSignOut} />}
 
                 <Button
                     label={submitting ? 'Signing in…' : 'Sign In'}
                     onPress={handleSubmit}
                     disabled={submitting || !emailAddress || !password || !emailValid}
                 />
-
-                {debugStage && (
-                    <Text style={{ color: colors.mutedForeground, fontSize: 12, marginTop: spacing[3] }}>
-                        [signin-debug] {debugStage}
-                    </Text>
-                )}
 
                 <Link
                     href={"/(auth)/sign-up"}
