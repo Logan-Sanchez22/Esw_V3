@@ -55,7 +55,9 @@ export type IsoDecorationKey =
     | 'flowerBunchGold'
     | 'flowerBunchPeriwinkle'
     | 'flowerStarWhite'
-    | 'flowerBunchOrange';
+    | 'flowerBunchOrange'
+    | 'flowerSprout'
+    | 'flowerBudding';
 
 export const isoDecorationAtlas: SpriteAtlas<IsoDecorationKey> = {
     source: require('@/assets/images/garden/misc.png'),
@@ -115,5 +117,16 @@ export const isoDecorationAtlas: SpriteAtlas<IsoDecorationKey> = {
         flowerBunchPeriwinkle: { x: 273, y: 63, width: 18, height: 18 },
         flowerStarWhite: { x: 143, y: 86, width: 19, height: 23 },
         flowerBunchOrange: { x: 166, y: 87, width: 19, height: 22 },
+        // Two more stages of the same white-star-flower cluster, further
+        // right on the same row, each one plant smaller — found the same
+        // connected-component-detection way as the two sprites above, then
+        // confirmed visually. Added for the Starflower growth feature (see
+        // CatalogItem.growth, garden-domain.ts): flowerSprout is the
+        // youngest (1 flower), flowerBudding next (2 flowers), then
+        // flowerBunchOrange (5), then flowerStarWhite fully bloomed (6) —
+        // the full 4-stage sequence is flowerSprout -> flowerBudding ->
+        // flowerBunchOrange -> flowerStarWhite.
+        flowerBudding: { x: 187, y: 94, width: 17, height: 11 },
+        flowerSprout: { x: 207, y: 95, width: 10, height: 11 },
     },
 };
