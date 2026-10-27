@@ -66,17 +66,35 @@ const SignIn = () => {
         if (!emailAddress || !password || !emailValid) return;
         setGenericError(null);
 
-        const { error } = await signIn.password({ emailAddress, password });
-        if (error) return; // field-specific messages come from `errors` below
+        // TEMPORARY DEBUG INSTRUMENTATION — remove once the stuck "Signing
+        // in…" issue is diagnosed. Tags every log so they're easy to find
+        // and grep: [signin-debug].
+        console.log('[signin-debug] calling signIn.password()...');
+        try {
+            const result = await signIn.password({ emailAddress, password });
+            console.log('[signin-debug] signIn.password() resolved:', JSON.stringify(result));
+            const { error } = result;
+            if (error) {
+                console.log('[signin-debug] error returned, stopping here:', JSON.stringify(error));
+                return; // field-specific messages come from `errors` below
+            }
 
-        if (signIn.status === 'complete') {
-            await completeSignIn();
-        } else if (signIn.status === 'needs_client_trust') {
-            const { error: codeError } = await signIn.mfa.sendEmailCode();
-            if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
-            else setNeedsDeviceVerification(true);
-        } else {
-            setGenericError(`Sign-in needs an additional step (${signIn.status}) not supported here yet.`);
+            console.log('[signin-debug] signIn.status is now:', signIn.status);
+            if (signIn.status === 'complete') {
+                console.log('[signin-debug] calling completeSignIn()...');
+                await completeSignIn();
+                console.log('[signin-debug] completeSignIn() returned');
+            } else if (signIn.status === 'needs_client_trust') {
+                console.log('[signin-debug] needs_client_trust — sending email code...');
+                const { error: codeError } = await signIn.mfa.sendEmailCode();
+                if (codeError) setGenericError(codeError.message ?? 'Could not send verification code.');
+                else setNeedsDeviceVerification(true);
+            } else {
+                setGenericError(`Sign-in needs an additional step (${signIn.status}) not supported here yet.`);
+            }
+        } catch (err) {
+            console.log('[signin-debug] signIn.password() THREW:', err);
+            setGenericError('Something went wrong — see terminal logs.');
         }
     };
 
