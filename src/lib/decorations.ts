@@ -25,8 +25,17 @@ type TopDownSpriteRef = { atlas: any; key: any };
  * This replaces two independently hand-maintained ITEM_SPRITE dictionaries
  * (one per garden screen) that could silently drift out of sync — this is
  * the single place both screens read from now.
+ *
+ * A screen's entry is normally one fixed IsoSpriteRef/TopDownSpriteRef — but
+ * for an item with CatalogItem.growth set (garden-domain.ts), it can
+ * instead be an ARRAY of them, one sprite per growth stage, in order from
+ * youngest to fully grown. getDecorationSprite below picks the right one
+ * out of that array for a given stage.
  */
-export const DECORATION_SPRITES: Record<string, { isometric?: IsoSpriteRef; topDown?: TopDownSpriteRef }> = {
+export const DECORATION_SPRITES: Record<
+    string,
+    { isometric?: IsoSpriteRef | IsoSpriteRef[]; topDown?: TopDownSpriteRef | TopDownSpriteRef[] }
+> = {
     tree: {
         isometric: { atlas: isoDecorationAtlas, key: 'treeFullGrown' },
         topDown: { atlas: topDownTreesAtlas, key: 'treeCherryPink' },
@@ -57,6 +66,19 @@ export const DECORATION_SPRITES: Record<string, { isometric?: IsoSpriteRef; topD
     goldenFlowers: {
         isometric: { atlas: isoDecorationAtlas, key: 'flowerBunchGold' },
         topDown: { atlas: topDownSmall16Atlas, key: 'flowerClusterPinkLily' },
+    },
+    // Iso-only, and the one entry whose `isometric` field is an ARRAY —
+    // four sprites, youngest to fully grown (see getGrowthStage,
+    // garden-domain.ts, for how the right index gets picked). No top-down
+    // growth art has been measured yet, so this falls back to
+    // UnknownItemMarker on that screen, same as bench today.
+    starflower: {
+        isometric: [
+            { atlas: isoDecorationAtlas, key: 'flowerSprout' },
+            { atlas: isoDecorationAtlas, key: 'flowerBudding' },
+            { atlas: isoDecorationAtlas, key: 'flowerBunchOrange' },
+            { atlas: isoDecorationAtlas, key: 'flowerStarWhite' },
+        ],
     },
     mushroom: {
         isometric: { atlas: isoDecorationAtlas, key: 'mushroomRed' },
@@ -93,8 +115,23 @@ export const DECORATION_SPRITES: Record<string, { isometric?: IsoSpriteRef; topD
 // returns "IsoSpriteRef or TopDownSpriteRef" and leaves the caller unsure
 // which one they actually got. The real, shared implementation is the third
 // line, with the actual `{ }` body.
-export function getDecorationSprite(id: string, screen: 'isometric'): IsoSpriteRef | undefined;
-export function getDecorationSprite(id: string, screen: 'topDown'): TopDownSpriteRef | undefined;
-export function getDecorationSprite(id: string, screen: 'isometric' | 'topDown') {
-    return DECORATION_SPRITES[id]?.[screen];
+//
+// `stage` is new and optional — every existing call site in the app (the
+// picker, the catalogue sheet, "does this item have art at all" checks)
+// calls this with no third argument at all, and keeps working completely
+// unchanged: when `stage` is omitted, a growing item's LAST sprite (fully
+// grown) is used, same as if it had just one fixed sprite like everything
+// else. Only garden.tsx's actual tile rendering passes a real stage.
+export function getDecorationSprite(id: string, screen: 'isometric', stage?: number): IsoSpriteRef | undefined;
+export function getDecorationSprite(id: string, screen: 'topDown', stage?: number): TopDownSpriteRef | undefined;
+export function getDecorationSprite(id: string, screen: 'isometric' | 'topDown', stage?: number) {
+    const entry = DECORATION_SPRITES[id]?.[screen];
+    // `Array.isArray` is how you tell, at runtime, which side of an
+    // `A | A[]` union a value actually is — TypeScript narrows the type
+    // for you inside this `if`, so `entry` is known to be an array below.
+    if (Array.isArray(entry)) {
+        const index = stage ?? entry.length - 1;
+        return entry[Math.min(index, entry.length - 1)];
+    }
+    return entry;
 }

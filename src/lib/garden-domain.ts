@@ -53,6 +53,12 @@ export type TileState = {
   // to some value). TypeScript's type for this field is really
   // `number | undefined`.
   anchorIndex?: number;
+  /** Epoch-ms timestamp of when this tile's item was placed — only ever set
+   * on a tile holding an item whose CatalogItem.growth is defined (see
+   * getGrowthStage below). Same optional/additive pattern as anchorIndex:
+   * every tile that isn't a growing plant simply never has this field, so
+   * no migration is needed for existing saved gardens. */
+  plantedAt?: number;
 };
 
 /**
@@ -105,6 +111,16 @@ export type CatalogItem = {
    * getItemFootprint/getFootprintCells below.
    */
   footprint?: { width: number; height: number };
+  /**
+   * Present only on an item that visually grows over time after being
+   * placed (e.g. a flower that blooms in stages). `stages` is how many
+   * distinct sprites it has (see decorations.ts); `durationMs` is the total
+   * real time from planting to fully grown, split evenly across them. See
+   * getGrowthStage below for how a tile's current stage is actually
+   * computed. Undefined = a normal, unchanging decoration — every existing
+   * item today.
+   */
+  growth?: { stages: number; durationMs: number };
 };
 
 export type GardenDomainState = {
@@ -227,7 +243,7 @@ export function pruneStaleFootprints(state: GardenDomainState): GardenDomainStat
 function clearFootprint(tiles: TileState[], anchorIndex: number, width: number, height: number): void {
   const cells = getFootprintCells(anchorIndex, width, height) ?? [anchorIndex];
   for (const cell of cells) {
-    tiles[cell] = { ...tiles[cell], item: null, anchorIndex: undefined };
+    tiles[cell] = { ...tiles[cell], item: null, anchorIndex: undefined, plantedAt: undefined };
   }
 }
 
@@ -270,6 +286,12 @@ export function placeItem(
   const { width, height } = getItemFootprint(item);
   const tiles = [...state.tiles];
   occupyFootprint(tiles, index, item.id, width, height);
+  // Stamp the planting time on the anchor tile, but only for an item that
+  // actually grows — every other item's tile is untouched, exactly as
+  // before this feature existed.
+  if (item.growth) {
+    tiles[index] = { ...tiles[index], plantedAt: Date.now() };
+  }
   return { ...state, points: state.points - item.cost, tiles };
 }
 
@@ -488,12 +510,44 @@ export function undoAction(state: GardenDomainState, action: UndoableAction): Ga
 }
 
 /**
+ * Which of a growing item's sprites (see decorations.ts) should be shown
+ * right now — a plain 0-based index, 0 = just planted, `stages - 1` = fully
+ * grown. Pure function of three inputs (the item, when it was planted, and
+ * "now"), not a stored value: nothing persists which stage a plant is in,
+ * because it's always fully recomputable from `plantedAt` alone. This is
+ * also why growth needs no server/storage changes beyond the plain
+ * `plantedAt` timestamp — the stage itself is derived, every time, the same
+ * way `getPlacementBlock` derives a yes/no instead of something being saved.
+ *
+ * Always returns a valid, in-range index — a caller never needs to
+ * null-check or clamp the result itself.
+ */
+export function getGrowthStage(item: CatalogItem, plantedAt: number | undefined, now: number): number {
+  if (!item.growth) return 0;
+  const lastStage = item.growth.stages - 1;
+  // No planting time on record (shouldn't normally happen — placeItem always
+  // sets one for a growing item) — defensively show fully grown rather than
+  // stuck looking like a permanent sprout.
+  if (plantedAt === undefined) return lastStage;
+  const elapsedMs = now - plantedAt;
+  if (elapsedMs <= 0) return 0;
+  const stageDurationMs = item.growth.durationMs / item.growth.stages;
+  return Math.min(Math.floor(elapsedMs / stageDurationMs), lastStage);
+}
+
+/**
  * The shared catalog of placeable items — same ids, labels and costs for both
  * garden screens, so picking "Tree" costs the same and behaves the same no
  * matter which view you're in. Each screen maps these ids to its own sprite
  * (see ITEM_SPRITE in garden.tsx / garden-alt.tsx) — not every id necessarily
  * has art in every atlas yet, so a screen may only show a subset of this list.
  */
+// Demo-only duration for live sessions — 4 stages over 1 minute (15s each),
+// fast enough to actually watch bloom in a meeting. Swap for a real value
+// (e.g. 3 real days: `3 * 24 * 60 * 60 * 1000`) before shipping to players —
+// this one named constant is the only thing that needs to change.
+const STARFLOWER_GROWTH_DURATION_MS = 60_000;
+
 // Just a plain array of objects shaped like CatalogItem (declared above) —
 // adding a new placeable thing to the game is literally adding one more
 // object to this list. `CatalogItem[]` means "an array where every element
@@ -513,6 +567,14 @@ export const CATALOG: CatalogItem[] = [
   { id: 'bushAlt', label: 'Bush', cost: 5, visualScale: 0.55, unlockThreshold: 30, category: 'plants' },
   { id: 'flower', label: 'Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
   { id: 'goldenFlowers', label: 'Golden Flowers', cost: 2, visualScale: 0.35, category: 'plants' },
+  {
+    id: 'starflower',
+    label: 'Starflower',
+    cost: 3,
+    visualScale: 0.4,
+    category: 'plants',
+    growth: { stages: 4, durationMs: STARFLOWER_GROWTH_DURATION_MS },
+  },
   { id: 'mushroom', label: 'Mushroom', cost: 3, visualScale: 0.3, unlockThreshold: 40, category: 'nature' },
   { id: 'rock', label: 'Rock', cost: 4, visualScale: 0.5, category: 'nature' },
   { id: 'log', label: 'Log', cost: 3, visualScale: 0.5, category: 'nature' },

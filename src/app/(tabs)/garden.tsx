@@ -49,6 +49,7 @@ import {
     getCatalogItem,
     getFootprintCells,
     getGroundFormation,
+    getGrowthStage,
     getItemFootprint,
     getMoveBlock,
     getPlacementBlock,
@@ -309,6 +310,29 @@ const Garden = () => {
         const id = setInterval(() => setSwayTick((t) => t + 1), 900);
         return () => clearInterval(id);
     }, [hasSwayableDecoration]);
+
+    // Same mechanism again, for a growing plant's sprite (see
+    // CatalogItem.growth, getGrowthStage in garden-domain.ts): the actual
+    // stage is computed fresh from Date.now() every time renderDecoration
+    // runs below, so this tick's own number is never read anywhere — its
+    // only job is to force a re-render every second so that fresh Date.now()
+    // read actually happens, instead of this screen sitting there forever
+    // showing a plant's very first sprite until something else (a tap, a
+    // placement) happens to trigger a re-render on its own.
+    const hasGrowingDecoration = useMemo(
+        () =>
+            state.tiles.some((tile) => {
+                if (!tile.item) return false;
+                return !!getCatalogItem(tile.item)?.growth;
+            }),
+        [state.tiles]
+    );
+    const [growTick, setGrowTick] = useState(0);
+    useEffect(() => {
+        if (!hasGrowingDecoration) return;
+        const id = setInterval(() => setGrowTick((t) => t + 1), 1000);
+        return () => clearInterval(id);
+    }, [hasGrowingDecoration]);
 
     // Placement/removal pop-in and fade-out. Deliberately built on the
     // legacy react-native Animated API, not Reanimated: this session's own
@@ -712,7 +736,6 @@ const Garden = () => {
                         const isGhost = isDecoratePreview || isMovePreview;
                         const isPopping = justPlacedIndex === index;
 
-                        const sprite = getDecorationSprite(itemId, 'isometric');
                         const catalogItem = getCatalogItem(itemId);
                         const decorationSize = TILE_WIDTH * (catalogItem?.visualScale ?? 1);
                         // Only real, already-settled trees/plants sway — never a ghost
@@ -722,6 +745,18 @@ const Garden = () => {
                             !isGhost && !isRemoving && (catalogItem?.category === 'trees' || catalogItem?.category === 'plants')
                                 ? getSwayDegrees(index, swayTick)
                                 : 0;
+                        // Same reasoning as swayDeg just above, for a growing plant's
+                        // stage instead of its sway angle: only a real, already-settled
+                        // planting reads its own tile's plantedAt. Leaving `growthStage`
+                        // undefined for anything else (a ghost preview, a non-growing
+                        // item) falls back to getDecorationSprite's own default — the
+                        // item's last/fully-grown sprite, same as before this feature
+                        // existed for every item that isn't Starflower.
+                        const growthStage =
+                            !isGhost && !isRemoving && catalogItem?.growth
+                                ? getGrowthStage(catalogItem, tile.plantedAt, Date.now())
+                                : undefined;
+                        const sprite = getDecorationSprite(itemId, 'isometric', growthStage);
 
                         return (
                             <Animated.View
